@@ -10,6 +10,7 @@
 #include "cinder/gl/GlslProg.h"
 #include "cinder/gl/Vbo.h"
 #include "Debug.h"
+#include "FileMonitor.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -35,12 +36,14 @@ class ImrodApp : public AppNative
 		gl::GlslProgRef m_shader;
 		Matrix44f m_matrix;
 		gl::VboMeshRef m_mesh;
-		gl::TextureRef m_diffuseTex;
-		gl::TextureRef m_aoTex;
-		gl::TextureRef m_illuminationTex;
-		gl::TextureRef m_normalTex;
-		gl::TextureRef m_specularTex;
+		gl::TextureRef m_texDiffuse;
+		gl::TextureRef m_texAO;
+		gl::TextureRef m_texIllumination;
+		gl::TextureRef m_texNormal;
+		gl::TextureRef m_texSpecular;
 		bool m_shaderHasErrors;
+		FileMonitorRef m_fileMonitorVert;
+		FileMonitorRef m_fileMonitorFrag;
 };
 
 void ImrodApp::prepareSettings(Settings* settings)
@@ -67,11 +70,11 @@ void ImrodApp::setup()
 	// Load textures
 	try
 	{
-		m_diffuseTex = gl::Texture::create(loadImage(loadAsset("imrod_Diffuse.png")));
-		m_aoTex = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
-		m_illuminationTex = gl::Texture::create(loadImage(loadAsset("imrod_Illumination.png")));
-		m_normalTex = gl::Texture::create(loadImage(loadAsset("imrod_norm.png")));
-		m_specularTex = gl::Texture::create(loadImage(loadAsset("imrod_spec.png")));
+		m_texDiffuse = gl::Texture::create(loadImage(loadAsset("imrod_Diffuse.png")));
+ 		m_texAO = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
+ 		m_texIllumination = gl::Texture::create(loadImage(loadAsset("imrod_Illumination.png")));
+ 		m_texNormal = gl::Texture::create(loadImage(loadAsset("imrod_norm.png")));
+ 		m_texSpecular = gl::Texture::create(loadImage(loadAsset("imrod_spec.png")));
 	}
 	catch(const std::exception& exc)
 	{
@@ -86,13 +89,13 @@ void ImrodApp::setup()
 	m_camera.setCenterOfInterestPoint(Vec3f(0.0f, bbox.getMax().y / 2, 0.0f));
 
 	// Create lights
-	gl::Light light1(gl::Light::DIRECTIONAL, 0);
+	/*gl::Light light1(gl::Light::DIRECTIONAL, 0);
 	light1.setDirection(Vec3f(0.0f, 0.0f, 1.0f).normalized());
 	light1.setAmbient(Color(0.5f, 0.5f, 0.5f));
 	light1.setDiffuse(Color(1.0f, 1.0f, 1.0f));
 	light1.setSpecular(Color(1.0f, 1.0f, 1.0f));
 	light1.enable();
-	m_lights.push_back(light1);
+	m_lights.push_back(light1);*/
 
 	/*gl::Light light2(gl::Light::POINT, 1);
 	light2.setPosition(Vec3f(100, 100, 100));
@@ -113,6 +116,8 @@ void ImrodApp::setup()
 	// Load shader
 	try
 	{
+		m_fileMonitorVert = FileMonitor::create(getAssetPath("shader.vert"));
+		m_fileMonitorFrag = FileMonitor::create(getAssetPath("shader.frag"));
 		m_shader = gl::GlslProg::create(loadAsset("shader.vert"), loadAsset("shader.frag"));
 		m_shaderHasErrors = false;
 	}
@@ -133,6 +138,21 @@ void ImrodApp::setup()
 
 void ImrodApp::update()
 {
+	if(m_fileMonitorVert->hasChanged() || m_fileMonitorFrag->hasChanged())
+	{
+		try
+		{
+			m_shader = gl::GlslProg::create(loadAsset("shader.vert"), loadAsset("shader.frag"));
+			m_shaderHasErrors = false;
+		}
+		catch(gl::GlslProgCompileExc& exc)
+		{
+			m_shaderHasErrors = true;
+			app::console() << "Shader load or compile error:" << std::endl;
+			app::console() << exc.what() << std::endl;
+			DBG("GlslProgCompileExc", std::string(exc.what()));
+		}
+	}
 }
 
 void ImrodApp::draw()
@@ -140,51 +160,55 @@ void ImrodApp::draw()
 	// Clear the window
 	gl::clear(ColorAf::gray(0.6f));
 	gl::color(Color::white());
-
+	gl::enable(GL_TEXTURE_2D);
 	// Setup camera
 	gl::pushMatrices();
 	gl::setMatrices(m_mayaCamera.getCamera());
-	for(auto light : m_lights)
+
+	//m_texDiffuse->bind(0);
+	//gl::drawCube(Vec3f::zero(), Vec3f(10.0f, 10.0f, 10.0f));
+	//return;
+
+	/*for(auto light : m_lights)
 	{
 		light.update(m_camera);
-	}
+	}*/
 
 	// Enable 3D rendering
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
-	//glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+
+	m_texDiffuse->bind(0);
+	gl::drawCube(Vec3f::zero(), Vec3f(10.0f, 10.0f, 10.0f));
+	//return;
 
 	// Draw ----------------------------------------------------------------------
 	if(!m_shaderHasErrors)
 	{
-		gl::pushModelView();
-		gl::multModelView(m_matrix);
-
 		// Bind shader
 		//gl::enable(GL_LIGHTING);
-		gl::enable(GL_TEXTURE_2D);
+		//gl::enable(GL_TEXTURE_2D);
 		//gl::enable(GL_NORMALIZE);
 		m_shader->bind();
 
-		m_shader->uniform("camera", m_mayaCamera.getCamera().getProjectionMatrix() * m_mayaCamera.getCamera().getModelViewMatrix());
-		m_diffuseTex->bind(0);
-		m_shader->uniform("texDiffuse", 0);
+		m_shader->uniform("projection", m_mayaCamera.getCamera().getProjectionMatrix());
+		m_shader->uniform("view", m_mayaCamera.getCamera().getModelViewMatrix());
 		m_shader->uniform("model", m_matrix);
 
-
+		m_texDiffuse->bind(0);
+		m_shader->uniform("texDiffuse", 0);
+			
+		gl::pushModelView();
+		gl::multModelView(m_matrix);
 		gl::draw(m_mesh);
-
-
 		gl::popModelView();
 
 		// Unbind shader
-		ci::gl::disable(GL_TEXTURE_2D);
-		//m_diffuseTex->unbind(0);
 		m_shader->unbind();
 	}
 	// End draw ----------------------------------------------------------------------
 
-	gl::disable(GL_LIGHTING);
+	//gl::disable(GL_LIGHTING);
 
 	// Disable 3D rendering
 	gl::disableDepthWrite();
