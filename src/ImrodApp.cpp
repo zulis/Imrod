@@ -44,6 +44,10 @@ class ImrodApp : public AppNative
 		bool m_shaderHasErrors;
 		FileMonitorRef m_fileMonitorVert;
 		FileMonitorRef m_fileMonitorFrag;
+		GLuint bindas1;
+		int uniformas1;
+		GLuint bindas2;
+		int uniformas2;
 };
 
 void ImrodApp::prepareSettings(Settings* settings)
@@ -55,9 +59,14 @@ void ImrodApp::prepareSettings(Settings* settings)
 
 void ImrodApp::setup()
 {
+	bindas1 = 0;
+	uniformas1 = 0;
+	bindas2 = 0;
+	uniformas2 = 0;
+
 	// Load mesh
 	ObjLoader loader(loadAsset("imrod.obj"));
-	loader.load(&m_triMesh, true);
+	loader.load(&m_triMesh);
 
 	// Set VBO mesh
 	gl::VboMesh::Layout layout;
@@ -71,10 +80,10 @@ void ImrodApp::setup()
 	try
 	{
 		m_texDiffuse = gl::Texture::create(loadImage(loadAsset("imrod_Diffuse.png")));
- 		m_texAO = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
- 		m_texIllumination = gl::Texture::create(loadImage(loadAsset("imrod_Illumination.png")));
- 		m_texNormal = gl::Texture::create(loadImage(loadAsset("imrod_norm.png")));
- 		m_texSpecular = gl::Texture::create(loadImage(loadAsset("imrod_spec.png")));
+		m_texAO = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
+		m_texIllumination = gl::Texture::create(loadImage(loadAsset("imrod_Illumination.png")));
+		m_texNormal = gl::Texture::create(loadImage(loadAsset("imrod_norm.png")));
+		m_texSpecular = gl::Texture::create(loadImage(loadAsset("imrod_spec.png")));
 	}
 	catch(const std::exception& exc)
 	{
@@ -153,6 +162,11 @@ void ImrodApp::update()
 			DBG("GlslProgCompileExc", std::string(exc.what()));
 		}
 	}
+
+	DBG("bindas1", (int)bindas1);
+	DBG("uniformas1", uniformas1);
+	DBG("bindas2", (int)bindas2);
+	DBG("uniformas2", uniformas2);
 }
 
 void ImrodApp::draw()
@@ -161,6 +175,8 @@ void ImrodApp::draw()
 	gl::clear(ColorAf::gray(0.6f));
 	gl::color(Color::white());
 	gl::enable(GL_TEXTURE_2D);
+	//gl::enable(GL_NORMALIZE);
+	//gl::enable(GL_LIGHTING);
 	// Setup camera
 	gl::pushMatrices();
 	gl::setMatrices(m_mayaCamera.getCamera());
@@ -178,26 +194,47 @@ void ImrodApp::draw()
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
 
-	m_texDiffuse->bind(0);
-	gl::drawCube(Vec3f::zero(), Vec3f(10.0f, 10.0f, 10.0f));
-	//return;
-
 	// Draw ----------------------------------------------------------------------
 	if(!m_shaderHasErrors)
 	{
-		// Bind shader
-		//gl::enable(GL_LIGHTING);
-		//gl::enable(GL_TEXTURE_2D);
-		//gl::enable(GL_NORMALIZE);
-		m_shader->bind();
+		m_texDiffuse->bind(bindas1);
+		m_texNormal->bind(bindas2);
+		//m_texAO->bind(2);
 
+		// Bind shader
+		m_shader->bind();
 		m_shader->uniform("projection", m_mayaCamera.getCamera().getProjectionMatrix());
 		m_shader->uniform("view", m_mayaCamera.getCamera().getModelViewMatrix());
 		m_shader->uniform("model", m_matrix);
 
-		m_texDiffuse->bind(0);
-		m_shader->uniform("texDiffuse", 0);
-			
+		m_shader->uniform("texDiffuse", uniformas1);
+		m_shader->uniform("texNormal", uniformas2);
+		//m_shader->uniform("texAO", 2);
+
+		GLint texDiffuseLocation = m_shader->getUniformLocation("texDiffuse");
+		//GLint texNormalLocation = m_shader->getUniformLocation("texNormal");
+		//GLint texAOLocation = m_shader->getUniformLocation("texAO");
+
+		DBG("uniform location", texDiffuseLocation);
+
+		//GLint index = 0;
+		//glUniform1i(texDiffuseLocation, index);
+		//glActiveTexture(GL_TEXTURE0 + index);
+		//glBindTexture(GL_TEXTURE_2D, m_texDiffuse->getId());
+		////glBindSampler(index, texDiffuseLocation);
+
+		//index = 1;
+		//glUniform1i(texNormalLocation, index);
+		//glActiveTexture(GL_TEXTURE0 + index);
+		//glBindTexture(GL_TEXTURE_2D, m_texNormal->getId());
+		////glBindSampler(index, texDiffuseLocation);
+
+		//index = 2;
+		//glUniform1i(texAOLocation, index);
+		//glActiveTexture(GL_TEXTURE0 + index);
+		//glBindTexture(GL_TEXTURE_2D, m_texAO->getId());
+		////glBindSampler(index, texDiffuseLocation);
+
 		gl::pushModelView();
 		gl::multModelView(m_matrix);
 		gl::draw(m_mesh);
@@ -214,6 +251,8 @@ void ImrodApp::draw()
 	gl::disableDepthWrite();
 	gl::disableDepthRead();
 
+
+
 	// Restore matrices
 	gl::popMatrices();
 
@@ -221,7 +260,7 @@ void ImrodApp::draw()
 	gl::setMatricesWindow(getWindowSize());
 	gl::setViewport(getWindowBounds());
 
-	if(m_shaderHasErrors)
+	//if(m_shaderHasErrors)
 	{
 		Debug::get().draw(ColorAf::white());
 	}
@@ -247,31 +286,71 @@ void ImrodApp::keyDown(KeyEvent event)
 {
 	switch(event.getCode())
 	{
-		case KeyEvent::KEY_f:
-		{
-			setFullScreen(!isFullScreen());
-			break;
-		}
+// 		case KeyEvent::KEY_f:
+// 		{
+// 			setFullScreen(!isFullScreen());
+// 			break;
+// 		}
 		case KeyEvent::KEY_ESCAPE:
 		{
 			quit();
 			break;
 		}
 		case KeyEvent::KEY_F5:
+		{
+			try
 			{
-				try
-				{
-					m_shader = gl::GlslProg::create(loadAsset("shader.vert"), loadAsset("shader.frag"));
-					m_shaderHasErrors = false;
-				}
-				catch(gl::GlslProgCompileExc& exc)
-				{
-					m_shaderHasErrors = true;
-					app::console() << "Shader load or compile error:" << std::endl;
-					app::console() << exc.what() << std::endl;
-					DBG("GlslProgCompileExc", std::string(exc.what()));
-				}
+				m_shader = gl::GlslProg::create(loadAsset("shader.vert"), loadAsset("shader.frag"));
+				m_shaderHasErrors = false;
+			}
+			catch(gl::GlslProgCompileExc& exc)
+			{
+				m_shaderHasErrors = true;
+				app::console() << "Shader load or compile error:" << std::endl;
+				app::console() << exc.what() << std::endl;
+				DBG("GlslProgCompileExc", std::string(exc.what()));
+			}
 
+			break;
+		}
+		case KeyEvent::KEY_q:
+			{
+				bindas1++;
+				break;
+			}
+		case KeyEvent::KEY_a:
+			{
+				bindas1--;
+				break;
+			}
+		case KeyEvent::KEY_w:
+			{
+				uniformas1++;
+				break;
+			}
+		case KeyEvent::KEY_s:
+			{
+				uniformas1--;
+				break;
+			}
+		case KeyEvent::KEY_e:
+			{
+				bindas2++;
+				break;
+			}
+		case KeyEvent::KEY_d:
+			{
+				bindas2--;
+				break;
+			}
+		case KeyEvent::KEY_r:
+			{
+				uniformas2++;
+				break;
+			}
+		case KeyEvent::KEY_f:
+			{
+				uniformas2--;
 				break;
 			}
 	}
