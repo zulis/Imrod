@@ -51,6 +51,28 @@ void Debug::print(const std::string& text, const ci::Vec2f value)
 	update(text, val);
 }
 
+void Debug::remove(const std::string& text)
+{
+	int idx = -1;
+	int tmpidx = 0;
+
+	for(auto& t : m_textMap)
+	{
+		if(t.first == text)
+		{
+			idx = tmpidx;
+			break;
+		}
+
+		tmpidx++;
+	}
+
+	if(idx != -1)
+	{
+		m_textMap.erase(m_textMap.begin() + idx);
+	}
+}
+
 void Debug::update(const std::string& text, const std::string& value)
 {
 	bool found = false;

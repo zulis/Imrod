@@ -7,6 +7,7 @@
 #include "cinder/Vector.h"
 
 #define DBG(text, value) Debug::get().print(text, value)
+#define DBG_REMOVE(text) Debug::get().remove(text)
 
 class Debug
 {
@@ -25,6 +26,7 @@ class Debug
 		void print(const std::string& text, bool value);
 		void print(const std::string& text, const ci::Vec3f value);
 		void print(const std::string& text, const ci::Vec2f value);
+		void remove(const std::string& text);
 		void draw(const ci::Color& color = ci::Color::black());
 		void clear();
 

@@ -1,18 +1,17 @@
-#version 330
+#version 120
 
-in vec3 position;
-in vec2 texcoord;
-in vec3 normal;
-
-out vec2 UV;
-
-uniform mat4 projection;
-uniform mat4 view;
-uniform mat4 model;
+varying vec4 vertex;
+varying vec3 normal;
 
 void main()
 {
-	mat4 mvp = projection * view * model;
-	gl_Position = mvp * vec4(position, 1);
-	UV = texcoord;
+	// calculate view space position
+	vertex = gl_ModelViewMatrix * gl_Vertex;
+	
+	// calculate view space normal
+	normal = normalize(gl_NormalMatrix * gl_Normal);
+
+	// pass texture coordinates and screen space position
+	gl_TexCoord[0] = gl_MultiTexCoord0;
+	gl_Position = ftransform();
 }
