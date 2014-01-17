@@ -1,4 +1,5 @@
 #include "cinder/app/AppNative.h"
+#include "cinder/params/Params.h"
 #include "cinder/Camera.h"
 #include "cinder/MayaCamUI.h"
 #include "cinder/ObjLoader.h"
@@ -33,9 +34,12 @@ public:
 
 private:
 	void loadShader();
-	bool isInitialized() const { return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse && 
-		m_texIllumination && m_texNormal && m_texSpecular && m_texAO ); }
-private:
+	bool isInitialized() const
+	{
+		return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
+		        m_texIllumination && m_texNormal && m_texSpecular && m_texAO);
+	}
+
 	CameraPersp m_camera;
 	MayaCamUI m_mayaCamera;
 	TriMesh m_triMesh;
@@ -51,6 +55,15 @@ private:
 	gl::TextureRef m_texSpecular;
 	FileMonitorRef m_fileMonitorVert;
 	FileMonitorRef m_fileMonitorFrag;
+	params::InterfaceGlRef m_params;
+	bool m_enableDiffuse;
+	bool m_enableAO;
+	bool m_enableIllumination;
+	bool m_enableNormal;
+	bool m_enableSpecular;
+	bool m_rotateMesh;
+	int m_maxLights;
+	float m_time;
 };
 
 void ImrodApp::prepareSettings(Settings* settings)
@@ -70,12 +83,13 @@ void ImrodApp::setup()
 		ObjLoader loader(loadAsset("imrod.obj"));
 		loader.load(&m_triMesh);
 
-		gl::VboMesh::Layout layout;
-		layout.setStaticPositions();
-		layout.setStaticNormals();
-		layout.setStaticTexCoords2d();
-		layout.setStaticIndices();
-		m_mesh = gl::VboMesh::create(m_triMesh, layout);
+		if(!m_triMesh.hasNormals())
+			m_triMesh.recalculateNormals();
+
+		if(!m_triMesh.hasTangents())
+			m_triMesh.recalculateTangents();
+
+		m_mesh = gl::VboMesh::create(m_triMesh);
 
 		m_texDiffuse = gl::Texture::create(loadImage(loadAsset("imrod_Diffuse.png")));
 		m_texAO = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
@@ -98,14 +112,18 @@ void ImrodApp::setup()
 
 	// Create lights
 	m_light1 = new gl::Light(gl::Light::DIRECTIONAL, 0);
-	m_light1->setAmbient( Color(0.0f, 0.0f, 0.1f) );
-	m_light1->setDiffuse( Color(0.9f, 0.6f, 0.3f) );
-	m_light1->setSpecular( Color(0.9f, 0.6f, 0.3f) );
+	m_light1->setDirection(Vec3f(0, 1, -1).normalized());
+	m_light1->setAmbient(Color(0.0f, 0.0f, 0.1f));
+	m_light1->setDiffuse(Color(0.9f, 0.6f, 0.3f));
+	m_light1->setSpecular(Color(0.9f, 0.6f, 0.3f));
 
 	m_light2 = new gl::Light(gl::Light::DIRECTIONAL, 1);
-	m_light2->setAmbient( Color(0.0f, 0.0f, 0.0f) );
-	m_light2->setDiffuse( Color(0.2f, 0.6f, 1.0f) );
-	m_light2->setSpecular( Color(0.2f, 0.2f, 0.2f) );
+	m_light2->setDirection(Vec3f(0, 1, 1).normalized());
+	m_light2->setAmbient(Color(0.0f, 0.0f, 0.0f));
+	m_light2->setDiffuse(Color(0.2f, 0.6f, 1.0f));
+	m_light2->setSpecular(Color(0.2f, 0.2f, 0.2f));
+
+	m_maxLights = 2;
 
 	// Load shader
 	loadShader();
@@ -115,6 +133,27 @@ void ImrodApp::setup()
 	m_matrix.translate(Vec3f::zero());
 	m_matrix.rotate(Vec3f::zero());
 	m_matrix.scale(Vec3f::one());
+
+	m_enableDiffuse = true;
+	m_enableAO = true;
+	m_enableIllumination = true;
+	m_enableNormal = true;
+	m_enableSpecular = true;
+
+	m_rotateMesh = false;
+
+	// Create a parameter window
+	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(200, 150));
+	m_params->addParam("Rotate", &m_rotateMesh);
+	m_params->addSeparator();
+	m_params->addParam("Diffuse Map", &m_enableDiffuse);
+	m_params->addParam("AO Map", &m_enableAO);
+	m_params->addParam("Illumination Map", &m_enableIllumination);
+	m_params->addParam("Normal Map", &m_enableNormal);
+	m_params->addParam("Specular Map", &m_enableSpecular);
+	m_params->setOptions("", "valueswidth=fit");
+
+	m_time = (float)getElapsedSeconds();
 }
 
 void ImrodApp::shutdown()
@@ -158,16 +197,26 @@ void ImrodApp::loadShader()
 
 void ImrodApp::update()
 {
+	// Track the time
+	float elapsed = (float) getElapsedSeconds() - m_time;
+	m_time += elapsed;
+
 	if(m_fileMonitorVert->hasChanged() || m_fileMonitorFrag->hasChanged())
 	{
 		loadShader();
+	}
+
+	if(m_rotateMesh)
+	{
+		float rotateAngle = elapsed * 0.2f;
+		m_matrix.rotate(Vec3f::yAxis(), rotateAngle);
 	}
 }
 
 void ImrodApp::draw()
 {
 	// Clear the window
-	gl::clear(ColorAf::gray(0.6f));
+	gl::clear();
 	gl::color(Color::white());
 
 	if(isInitialized())
@@ -181,14 +230,24 @@ void ImrodApp::draw()
 
 		// Bind textures
 		m_texDiffuse->enableAndBind();
-		m_texNormal->bind(1);
-		m_texAO->bind(2);
+		m_texAO->bind(1);
+		m_texIllumination->bind(2);
+		m_texNormal->bind(3);
+		m_texSpecular->bind(4);
 
 		// Bind shader
 		m_shader->bind();
 		m_shader->uniform("texDiffuse", 0);
-		m_shader->uniform("texNormal", 1);
-		m_shader->uniform("texAO", 2);
+		m_shader->uniform("texAO", 1);
+		m_shader->uniform("texIllumination", 2);
+		m_shader->uniform("texNormal", 3);
+		m_shader->uniform("texSpecular", 4);
+		m_shader->uniform("enableDiffuse", m_enableDiffuse);
+		m_shader->uniform("enableAO", m_enableAO);
+		m_shader->uniform("enableIllumination", m_enableIllumination);
+		m_shader->uniform("enableNormal", m_enableNormal);
+		m_shader->uniform("enableSpecular", m_enableSpecular);
+		m_shader->uniform("maxLights", m_maxLights);
 
 		// Enable lights
 		m_light1->enable();
@@ -220,6 +279,10 @@ void ImrodApp::draw()
 		// Enable 2D rendering
 		gl::setMatricesWindow(getWindowSize());
 		gl::setViewport(getWindowBounds());
+
+		// Render parameter window
+		if(m_params)
+			m_params->draw();
 	}
 
 	// Render debug information
@@ -234,7 +297,7 @@ void ImrodApp::resize()
 
 void ImrodApp::mouseDown(MouseEvent event)
 {
-	m_mayaCamera.setCurrentCam( m_camera );
+	m_mayaCamera.setCurrentCam(m_camera);
 	m_mayaCamera.mouseDown(event.getPos());
 }
 
@@ -248,17 +311,17 @@ void ImrodApp::keyDown(KeyEvent event)
 {
 	switch(event.getCode())
 	{
-	case KeyEvent::KEY_f:
+		case KeyEvent::KEY_f:
 		{
 			setFullScreen(!isFullScreen());
 			break;
 		}
-	case KeyEvent::KEY_ESCAPE:
+		case KeyEvent::KEY_ESCAPE:
 		{
 			quit();
 			break;
 		}
-	case KeyEvent::KEY_F5:
+		case KeyEvent::KEY_F5:
 		{
 			loadShader();
 			break;

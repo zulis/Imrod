@@ -13,22 +13,22 @@ typedef std::shared_ptr<class FileMonitor> FileMonitorRef;
 class FileMonitor
 {
 public:
-    static FileMonitorRef create(const boost::filesystem::path &fileName)
+	static FileMonitorRef create(const boost::filesystem::path& fileName)
 	{
 		return FileMonitorRef(new FileMonitor(fileName));
 	}
 
-    bool hasChanged();
+	bool hasChanged();
 
 private:
-	FileMonitor(const boost::filesystem::path &fileName);
+	FileMonitor(const boost::filesystem::path& fileName);
 	boost::filesystem::path m_fileName;
-    int m_checksum;
-    boost::timer m_time;
-    const int getChecksum();
+	int m_checksum;
+	boost::timer m_time;
+	const int getChecksum();
 };
 
-FileMonitor::FileMonitor(const boost::filesystem::path &fileName)
+FileMonitor::FileMonitor(const boost::filesystem::path& fileName)
 {
 	m_fileName = fileName;
 	m_checksum = getChecksum();

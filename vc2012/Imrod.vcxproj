@@ -107,7 +107,6 @@
     <ResourceCompile Include="Resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\Debug.cpp" />
     <ClCompile Include="..\src\ImrodApp.cpp" />
   </ItemGroup>
   <ItemGroup>
