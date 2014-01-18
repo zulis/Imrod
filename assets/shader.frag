@@ -19,6 +19,10 @@ uniform bool enableSpecular;
 
 uniform int maxLights;
 
+float diffuseStrength = 2.0;
+float illuminationStrength = 0.5;
+float specularStrength = 15.0;
+
 void main()
 {
 	// fetch the normal from the normal map and modify it using the normal from the mesh
@@ -28,12 +32,17 @@ void main()
 	vec3 toCamera = normalize(-vertex.xyz);
 
 	// apply each of our light sources
-	vec4 diffuseColor = enableIllumination ? texture2D(texIllumination, gl_TexCoord[0].st) : vec4(0, 0, 0, 1);
+	vec4 diffuseColor = vec4(0, 0, 0, 1);
 	vec4 specularColor = vec4(0, 0, 0, 0);
-	vec4 aoColor = vec4(0, 0, 0, 1);
 
 	for(int i = 0; i < maxLights; ++i)
 	{
+		if(enableAO)
+		{
+			vec4 aoColor = texture2D(texAO, gl_TexCoord[0].st);
+			diffuseColor = vec4(diffuseColor.rgb * aoColor.rgb, 1.0);
+		}
+
 		// calculate view space light vectors (for directional light source)
 		vec3 toLight = normalize(-gl_LightSource[i].position.xyz);
 		vec3 reflect = normalize(-reflect(toLight, surfaceNormal));
@@ -43,26 +52,27 @@ void main()
 		diffuse = clamp(diffuse, 0.1, 1.0);
 
 		// calculate specular term
-		float specularPower = 200.0;
+		float specularPower = 100.0;
 		float specular = pow(max(dot(reflect, toCamera), 0.0), specularPower);
 		specular = clamp(specular, 0.0, 1.0);
 
 		// calculate final colors
 		if(enableDiffuse)
-			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * gl_LightSource[i].diffuse * diffuse;
+		{
+			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * diffuseStrength * gl_LightSource[i].diffuse * diffuse;
+		}
 		else
 			diffuseColor += gl_LightSource[i].diffuse * diffuse;
 
 		if(enableSpecular)
-			specularColor = texture2D(texSpecular, gl_TexCoord[0].st) * gl_LightSource[i].specular * specular;
-		else
-			specularColor += gl_LightSource[i].specular * specular;
+			specularColor = texture2D(texSpecular, gl_TexCoord[0].st) * gl_LightSource[i].specular * specular * specularStrength;
+		//else
+			//specularColor += gl_LightSource[i].specular * specular;
 
-		//if(enableAO)
-		//{
-		//	aoColor = texture2D(texAO, gl_TexCoord[0].st);
-		//	diffuseColor = mix(diffuseColor, aoColor, 0.5);
-		//}
+		if(enableIllumination)
+		{
+			diffuseColor += texture2D(texIllumination, gl_TexCoord[0].st) * illuminationStrength;
+		}
 	}
 	
 	// output colors to buffer

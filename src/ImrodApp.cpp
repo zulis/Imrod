@@ -112,13 +112,13 @@ void ImrodApp::setup()
 
 	// Create lights
 	m_light1 = new gl::Light(gl::Light::DIRECTIONAL, 0);
-	m_light1->setDirection(Vec3f(0, 1, -1).normalized());
+	m_light1->setDirection(Vec3f(0, 1, 1).normalized());	
 	m_light1->setAmbient(Color(0.0f, 0.0f, 0.1f));
 	m_light1->setDiffuse(Color(0.9f, 0.6f, 0.3f));
 	m_light1->setSpecular(Color(0.9f, 0.6f, 0.3f));
 
 	m_light2 = new gl::Light(gl::Light::DIRECTIONAL, 1);
-	m_light2->setDirection(Vec3f(0, 1, 1).normalized());
+	m_light2->setDirection(Vec3f(0, 1, -1).normalized());
 	m_light2->setAmbient(Color(0.0f, 0.0f, 0.0f));
 	m_light2->setDiffuse(Color(0.2f, 0.6f, 1.0f));
 	m_light2->setSpecular(Color(0.2f, 0.2f, 0.2f));
@@ -139,12 +139,15 @@ void ImrodApp::setup()
 	m_enableIllumination = true;
 	m_enableNormal = true;
 	m_enableSpecular = true;
-
-	m_rotateMesh = false;
+	m_rotateMesh = true;
 
 	// Create a parameter window
-	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(200, 150));
-	m_params->addParam("Rotate", &m_rotateMesh);
+	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(200, 210));
+	m_params->addText("LMB + drag - rotate");
+	m_params->addText("RMB + drag - zoom");
+	m_params->addText("F              - full screen");
+	m_params->addSeparator();
+	m_params->addParam("Auto rotate", &m_rotateMesh);
 	m_params->addSeparator();
 	m_params->addParam("Diffuse Map", &m_enableDiffuse);
 	m_params->addParam("AO Map", &m_enableAO);
@@ -158,7 +161,7 @@ void ImrodApp::setup()
 
 void ImrodApp::shutdown()
 {
-	// Safely delete our lights
+	// Safely delete lights
 	if(m_light1)
 	{
 		delete m_light1;
