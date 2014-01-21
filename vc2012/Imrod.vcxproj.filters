@@ -45,10 +45,16 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\assets\shader.frag">
+    <None Include="..\assets\shaders\skybox.frag">
       <Filter>Shader Files</Filter>
     </None>
-    <None Include="..\assets\shader.vert">
+    <None Include="..\assets\shaders\skybox.vert">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="..\assets\shaders\mesh.frag">
+      <Filter>Shader Files</Filter>
+    </None>
+    <None Include="..\assets\shaders\mesh.vert">
       <Filter>Shader Files</Filter>
     </None>
   </ItemGroup>

@@ -145,7 +145,7 @@ void ImrodApp::setup()
 	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(200, 210));
 	m_params->addText("LMB + drag - rotate");
 	m_params->addText("RMB + drag - zoom");
-	m_params->addText("F              - full screen");
+	m_params->addButton("Full screen", [&] { setFullScreen(!isFullScreen()); });
 	m_params->addSeparator();
 	m_params->addParam("Auto rotate", &m_rotateMesh);
 	m_params->addSeparator();
@@ -182,9 +182,9 @@ void ImrodApp::loadShader()
 
 	try
 	{
-		m_fileMonitorVert = FileMonitor::create(getAssetPath("shader.vert"));
-		m_fileMonitorFrag = FileMonitor::create(getAssetPath("shader.frag"));
-		m_shader = gl::GlslProg::create(loadAsset("shader.vert"), loadAsset("shader.frag"));
+		m_fileMonitorVert = FileMonitor::create(getAssetPath("shaders/mesh.vert"));
+		m_fileMonitorFrag = FileMonitor::create(getAssetPath("shaders/mesh.frag"));
+		m_shader = gl::GlslProg::create(loadAsset("shaders/mesh.vert"), loadAsset("shaders/mesh.frag"));
 		const std::string log = m_shader->getShaderLog(m_shader->getHandle());
 
 		if(log != std::string())
