@@ -11,6 +11,7 @@
 #include "cinder/gl/Vbo.h"
 #include "Debug.h"
 #include "FileMonitor.h"
+#include "Config.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -33,11 +34,13 @@ public:
 	void keyDown(KeyEvent event);
 
 private:
+	void loadModel(const std::string& fileName);
 	void loadShader();
 	bool isInitialized() const
 	{
-		return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
-		        m_texIllumination && m_texNormal && m_texSpecular && m_texAO);
+		/*return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
+		        m_texEmissive && m_texNormal && m_texSpecular && m_texAO);*/
+		return (m_shader && m_mesh);
 	}
 
 	CameraPersp m_camera;
@@ -50,19 +53,24 @@ private:
 	gl::GlslProgRef m_shader;
 	gl::TextureRef m_texDiffuse;
 	gl::TextureRef m_texAO;
-	gl::TextureRef m_texIllumination;
+	gl::TextureRef m_texEmissive;
 	gl::TextureRef m_texNormal;
 	gl::TextureRef m_texSpecular;
 	FileMonitorRef m_fileMonitorVert;
 	FileMonitorRef m_fileMonitorFrag;
 	params::InterfaceGlRef m_params;
-	bool m_enableDiffuse;
-	bool m_enableAO;
-	bool m_enableIllumination;
-	bool m_enableNormal;
-	bool m_enableSpecular;
+	bool m_diffuseEnabled;
+	bool m_aoEnabled;
+	bool m_emissiveEnabled;
+	bool m_normalEnabled;
+	bool m_specularEnabled;
+	float m_diffusePower;
+	float m_aoPower;
+	float m_emissivePower;
+	float m_normalPower;
+	float m_specularPower;
+	float m_brightness;
 	bool m_rotateMesh;
-	int m_maxLights;
 	float m_time;
 };
 
@@ -77,32 +85,7 @@ void ImrodApp::prepareSettings(Settings* settings)
 
 void ImrodApp::setup()
 {
-	// Load assets
-	try
-	{
-		ObjLoader loader(loadAsset("imrod.obj"));
-		loader.load(&m_triMesh);
-
-		if(!m_triMesh.hasNormals())
-			m_triMesh.recalculateNormals();
-
-		if(!m_triMesh.hasTangents())
-			m_triMesh.recalculateTangents();
-
-		m_mesh = gl::VboMesh::create(m_triMesh);
-
-		m_texDiffuse = gl::Texture::create(loadImage(loadAsset("imrod_Diffuse.png")));
-		m_texAO = gl::Texture::create(loadImage(loadAsset("imrod_ao.png")));
-		m_texIllumination = gl::Texture::create(loadImage(loadAsset("imrod_Illumination.png")));
-		m_texNormal = gl::Texture::create(loadImage(loadAsset("imrod_norm.png")));
-		m_texSpecular = gl::Texture::create(loadImage(loadAsset("imrod_spec.png")));
-	}
-	catch(const std::exception& e)
-	{
-		console() << "Failed to load assets:" << std::endl;
-		console() << e.what();
-		quit();
-	}
+	loadModel("models/teapot/teapot.ini");
 
 	// Set up the camera
 	m_camera.setEyePoint(Vec3f(0.0f, 0.0f, 100.0f));
@@ -112,7 +95,7 @@ void ImrodApp::setup()
 
 	// Create lights
 	m_light1 = new gl::Light(gl::Light::DIRECTIONAL, 0);
-	m_light1->setDirection(Vec3f(0, 1, 1).normalized());	
+	m_light1->setDirection(Vec3f(0, 1, 1).normalized());
 	m_light1->setAmbient(Color(0.0f, 0.0f, 0.1f));
 	m_light1->setDiffuse(Color(0.9f, 0.6f, 0.3f));
 	m_light1->setSpecular(Color(0.9f, 0.6f, 0.3f));
@@ -123,8 +106,6 @@ void ImrodApp::setup()
 	m_light2->setDiffuse(Color(0.2f, 0.6f, 1.0f));
 	m_light2->setSpecular(Color(0.2f, 0.2f, 0.2f));
 
-	m_maxLights = 2;
-
 	// Load shader
 	loadShader();
 
@@ -134,27 +115,28 @@ void ImrodApp::setup()
 	m_matrix.rotate(Vec3f::zero());
 	m_matrix.scale(Vec3f::one());
 
-	m_enableDiffuse = true;
-	m_enableAO = true;
-	m_enableIllumination = true;
-	m_enableNormal = true;
-	m_enableSpecular = true;
-	m_rotateMesh = true;
+	m_rotateMesh = false;
 
 	// Create a parameter window
-	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(200, 210));
+	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(220, 320));
 	m_params->addText("LMB + drag - rotate");
 	m_params->addText("RMB + drag - zoom");
-	m_params->addButton("Full screen", [&] { setFullScreen(!isFullScreen()); });
 	m_params->addSeparator();
+	m_params->addButton("Full screen", [&] { setFullScreen(!isFullScreen()); });
 	m_params->addParam("Auto rotate", &m_rotateMesh);
 	m_params->addSeparator();
-	m_params->addParam("Diffuse Map", &m_enableDiffuse);
-	m_params->addParam("AO Map", &m_enableAO);
-	m_params->addParam("Illumination Map", &m_enableIllumination);
-	m_params->addParam("Normal Map", &m_enableNormal);
-	m_params->addParam("Specular Map", &m_enableSpecular);
-	m_params->setOptions("", "valueswidth=fit");
+	m_params->addParam("Diffuse", &m_diffuseEnabled);
+	m_params->addParam("Diffuse power", &m_diffusePower, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("AO Map", &m_aoEnabled);
+	m_params->addParam("AO power", &m_aoPower, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("Emissive Map", &m_emissiveEnabled);
+	m_params->addParam("Emissive power", &m_emissivePower, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("Normal Map", &m_normalEnabled);
+	m_params->addParam("Normal power", &m_normalPower, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("Specular Map", &m_specularEnabled);
+	m_params->addParam("Specular power", &m_specularPower, "min=0.0 max=10.0 step=0.1");
+	m_params->addSeparator();
+	m_params->addParam("Brightness", &m_brightness, "min=0.0 max=10.0 step=0.1");
 
 	m_time = (float)getElapsedSeconds();
 }
@@ -172,6 +154,65 @@ void ImrodApp::shutdown()
 	{
 		delete m_light2;
 		m_light2 = NULL;
+	}
+}
+
+void ImrodApp::loadModel(const std::string& fileName)
+{
+	try
+	{
+		Config meshCfg(fileName);
+
+		ObjLoader loader(loadAsset(meshCfg.getString("Model", "FileName")));
+		loader.load(&m_triMesh);
+
+		if(!m_triMesh.hasNormals())
+			m_triMesh.recalculateNormals();
+
+		if(!m_triMesh.hasTangents())
+			m_triMesh.recalculateTangents();
+
+		m_mesh = gl::VboMesh::create(m_triMesh);
+
+		meshCfg.setSection("Material");
+
+		std::string diffuseFileName = meshCfg.getString("Diffuse");
+		if(diffuseFileName != std::string())
+			m_texDiffuse = gl::Texture::create(loadImage(loadAsset(diffuseFileName)));
+
+		std::string aoFileName = meshCfg.getString("AO");
+		if(aoFileName != std::string())
+			m_texAO = gl::Texture::create(loadImage(loadAsset(aoFileName)));
+
+		std::string emissiveFileName = meshCfg.getString("Emissive");
+		if(emissiveFileName != std::string())
+			m_texEmissive = gl::Texture::create(loadImage(loadAsset(emissiveFileName)));
+
+		std::string normalFileName = meshCfg.getString("Normal");
+		if(normalFileName != std::string())
+			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
+
+		std::string specularFileName = meshCfg.getString("Specular");
+		if(specularFileName != std::string())
+			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
+
+		m_diffuseEnabled = m_texDiffuse != NULL;
+		m_aoEnabled = m_texAO != NULL;
+		m_emissiveEnabled = m_texEmissive != NULL;
+		m_normalEnabled = m_texNormal != NULL;
+		m_specularEnabled = m_texSpecular != NULL;
+
+		m_diffusePower = meshCfg.getFloat("DiffusePower");
+		m_aoPower = meshCfg.getFloat("AOPower");
+		m_emissivePower = meshCfg.getFloat("EmissivePower");
+		m_normalPower = meshCfg.getFloat("NormalPower");
+		m_specularPower = meshCfg.getFloat("SpecularPower");
+		m_brightness = meshCfg.getFloat("Brightness");
+	}
+	catch(const std::exception& e)
+	{
+		console() << "Failed to load assets:" << std::endl;
+		console() << e.what();
 	}
 }
 
@@ -232,25 +273,39 @@ void ImrodApp::draw()
 		gl::enableDepthWrite();
 
 		// Bind textures
-		m_texDiffuse->enableAndBind();
-		m_texAO->bind(1);
-		m_texIllumination->bind(2);
-		m_texNormal->bind(3);
-		m_texSpecular->bind(4);
+		if(m_texDiffuse)
+			m_texDiffuse->enableAndBind();
+
+		if(m_texAO)
+			m_texAO->bind(1);
+
+		if(m_texEmissive)
+			m_texEmissive->bind(2);
+
+		if(m_texNormal)
+			m_texNormal->bind(3);
+
+		if(m_texSpecular)
+			m_texSpecular->bind(4);
 
 		// Bind shader
 		m_shader->bind();
 		m_shader->uniform("texDiffuse", 0);
 		m_shader->uniform("texAO", 1);
-		m_shader->uniform("texIllumination", 2);
+		m_shader->uniform("texEmissive", 2);
 		m_shader->uniform("texNormal", 3);
 		m_shader->uniform("texSpecular", 4);
-		m_shader->uniform("enableDiffuse", m_enableDiffuse);
-		m_shader->uniform("enableAO", m_enableAO);
-		m_shader->uniform("enableIllumination", m_enableIllumination);
-		m_shader->uniform("enableNormal", m_enableNormal);
-		m_shader->uniform("enableSpecular", m_enableSpecular);
-		m_shader->uniform("maxLights", m_maxLights);
+		m_shader->uniform("diffuseEnabled", m_diffuseEnabled);
+		m_shader->uniform("aoEnabled", m_aoEnabled);
+		m_shader->uniform("emissiveEnabled", m_emissiveEnabled);
+		m_shader->uniform("normalEnabled", m_normalEnabled);
+		m_shader->uniform("specularEnabled", m_specularEnabled);
+		m_shader->uniform("diffusePower", m_diffusePower);
+		m_shader->uniform("aoPower", m_aoPower);
+		m_shader->uniform("emissivePower", m_emissivePower);
+		m_shader->uniform("normalPower", m_normalPower);
+		m_shader->uniform("specularPower", m_specularPower);
+		m_shader->uniform("brightness", m_brightness);
 
 		// Enable lights
 		m_light1->enable();
@@ -324,9 +379,9 @@ void ImrodApp::keyDown(KeyEvent event)
 			quit();
 			break;
 		}
-		case KeyEvent::KEY_F5:
+		case KeyEvent::KEY_SPACE:
 		{
-			loadShader();
+			m_rotateMesh = !m_rotateMesh;
 			break;
 		}
 	}

@@ -112,6 +112,7 @@
   <ItemGroup>
     <ClInclude Include="..\include\Debug.h" />
     <ClInclude Include="..\include\FileMonitor.h" />
+    <ClInclude Include="..\include\Config.h" />
     <ClInclude Include="..\include\Resources.h" />
   </ItemGroup>
   <ItemGroup>

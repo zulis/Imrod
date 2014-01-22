@@ -10,7 +10,7 @@ void main()
 	// calculate view space position
 	vertex = gl_ModelViewMatrix * gl_Vertex;
 	
-	// calculate view space normal, tangent and bitangent
+	// transform the normal, tangent into eye space and normalize the result
 	normal = normalize(gl_NormalMatrix * gl_Normal);
 	tangent = normalize(gl_NormalMatrix * gl_MultiTexCoord7.xyz);
 	bitangent = normalize(cross(normal, tangent));
