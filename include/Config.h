@@ -12,7 +12,7 @@ using namespace ci::app;
 class Config
 {
 public:
-	Config(const std::string& filename);
+	Config(const std::string& fileName);
 	~Config();
 
 	void setSection(const std::string& section);
@@ -47,9 +47,16 @@ bool Config::get(const std::string& section, const std::string& value, T& result
 	}
 }
 
-Config::Config(const std::string& filename)
+Config::Config(const std::string& fileName)
 {
-	boost::property_tree::ini_parser::read_ini(loadAsset(filename)->getFilePath().string(), m_pt);
+	std::string fullPath = fileName;
+	
+	if(!boost::filesystem::exists(boost::filesystem::path(fullPath)))
+	{
+		fullPath = getAssetPath(fileName).string();
+	}
+	
+	boost::property_tree::ini_parser::read_ini(fullPath, m_pt);
 }
 
 Config::~Config()

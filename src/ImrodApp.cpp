@@ -32,9 +32,11 @@ public:
 	void mouseDown(MouseEvent event);
 	void mouseDrag(MouseEvent event);
 	void keyDown(KeyEvent event);
+	void fileDrop(FileDropEvent event);
 
 private:
 	void loadModel(const std::string& fileName);
+	void setupCamera();
 	void loadShader();
 	bool isInitialized() const
 	{
@@ -87,11 +89,7 @@ void ImrodApp::setup()
 {
 	loadModel("models/teapot/teapot.ini");
 
-	// Set up the camera
-	m_camera.setEyePoint(Vec3f(0.0f, 0.0f, 100.0f));
-	AxisAlignedBox3f bbox = m_triMesh.calcBoundingBox();
-	m_camera.setEyePoint(Vec3f(0.0f, bbox.getMax().y, bbox.getMax().y * 1.7f));
-	m_camera.setCenterOfInterestPoint(Vec3f(0.0f, bbox.getMax().y / 2, 0.0f));
+	setupCamera();
 
 	// Create lights
 	m_light1 = new gl::Light(gl::Light::DIRECTIONAL, 0);
@@ -385,6 +383,24 @@ void ImrodApp::keyDown(KeyEvent event)
 			break;
 		}
 	}
+}
+
+void ImrodApp::fileDrop(FileDropEvent event)
+{
+	loadModel(event.getFile(0).string());
+	setupCamera();
+}
+
+void ImrodApp::setupCamera()
+{
+	m_camera.setEyePoint(Vec3f(0.0f, 0.0f, 100.0f));
+	AxisAlignedBox3f bbox = m_triMesh.calcBoundingBox();
+	Vec3f size = bbox.getSize();
+	float max = size.x;
+	max = max < size.y ? size.y : max;
+	max = max < size.z ? size.z : max;
+	m_camera.setEyePoint(Vec3f(0.0f, max, max * 2.0f));
+	m_camera.setCenterOfInterestPoint(bbox.getCenter());
 }
 
 CINDER_APP_NATIVE(ImrodApp, RendererGl)

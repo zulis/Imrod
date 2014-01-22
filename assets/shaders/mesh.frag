@@ -24,10 +24,39 @@ uniform float normalPower;
 uniform float specularPower;
 uniform float brightness;
 
+
 void main()
+{   
+	float materialAlpha = 1.0;
+	vec4 diffuseColor = vec4(0, 0, 0, 1);
+
+    vec3 n = normalize(normal);
+
+	for(int i = 0; i < gl_MaxLights; i++)
+	{
+		float nDotL = max(0.0, dot(n, gl_LightSource[i].position.xyz));
+		float nDotH = max(0.0, dot(normal, vec3(gl_LightSource[i].halfVector)));
+		float power = (nDotL == 0.0) ? 0.0 : pow(nDotH, gl_FrontMaterial.shininess);
+
+		vec4 ambient = gl_FrontLightProduct[i].ambient;
+		vec4 diffuse = gl_FrontLightProduct[i].diffuse * nDotL;
+		vec4 specular = gl_FrontLightProduct[i].specular * power;
+		vec4 color = gl_FrontLightModelProduct.sceneColor + ambient + diffuse + specular;
+
+		if(diffuseEnabled)
+			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * color;
+		else
+			diffuseColor += color;
+	}
+
+    gl_FragColor = diffuseColor;
+    gl_FragColor.a = materialAlpha;
+}
+
+void main2()
 {
 	// fetch the normal from the normal map and modify it using the normal from the mesh
-	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb * 2.0 - 1.0;
+	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb *  2.0 - 1.0;
 	vec3 surfaceNormal = normalEnabled ? normalize((tangent * mappedNormal.x) + (bitangent * mappedNormal.y) + (normal * mappedNormal.z)) : normal;
 
 	vec3 toCamera = normalize(-vertex.xyz);
@@ -54,11 +83,11 @@ void main()
 			diffuseColor += gl_LightSource[i].diffuse * diffuse;
 		}
 
-		/*if(aoEnabled)
-		{
-			vec4 aoColor = texture2D(texAO, gl_TexCoord[0].st) * aoPower;
-			diffuseColor = diffuseColor * aoColor;
-		}*/
+		//if(aoEnabled)
+		//{
+		//	vec4 aoColor = texture2D(texAO, gl_TexCoord[0].st) * aoPower;
+		//	diffuseColor = diffuseColor * aoColor;
+		//}
 
 		if(emissiveEnabled)
 		{
