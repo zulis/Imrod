@@ -50,12 +50,12 @@ bool Config::get(const std::string& section, const std::string& value, T& result
 Config::Config(const std::string& fileName)
 {
 	std::string fullPath = fileName;
-	
+
 	if(!boost::filesystem::exists(boost::filesystem::path(fullPath)))
 	{
 		fullPath = getAssetPath(fileName).string();
 	}
-	
+
 	boost::property_tree::ini_parser::read_ini(fullPath, m_pt);
 }
 

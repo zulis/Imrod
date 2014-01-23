@@ -142,7 +142,7 @@ void Debug::draw(const Color& color)
 
 	unsigned int x = 10;
 	float fontSize = m_Font->getAscent() * FONT_SCALE;;
-	unsigned int y = static_cast<int>(fontSize) + 10;
+	unsigned int y = static_cast<int>(fontSize)+10;
 	size_t maxChars = 0;
 
 	for(auto& t : m_textMap)

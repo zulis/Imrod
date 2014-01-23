@@ -24,17 +24,17 @@ uniform float normalPower;
 uniform float specularPower;
 uniform float brightness;
 
-
-void main()
+void main6()
 {   
-	float materialAlpha = 1.0;
+	// fetch the normal from the normal map and modify it using the normal from the mesh
+	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb *  2.0 - 1.0;
+	vec3 surfaceNormal = normalEnabled ? normalize((tangent * mappedNormal.x) + (bitangent * mappedNormal.y) + (normal * mappedNormal.z)) : normal;
+	vec3 toCamera = normalize(-vertex.xyz);
 	vec4 diffuseColor = vec4(0, 0, 0, 1);
-
-    vec3 n = normalize(normal);
 
 	for(int i = 0; i < gl_MaxLights; i++)
 	{
-		float nDotL = max(0.0, dot(n, gl_LightSource[i].position.xyz));
+		float nDotL = max(0.0, dot(normalize(normal), gl_LightSource[i].position.xyz));
 		float nDotH = max(0.0, dot(normal, vec3(gl_LightSource[i].halfVector)));
 		float power = (nDotL == 0.0) ? 0.0 : pow(nDotH, gl_FrontMaterial.shininess);
 
@@ -43,17 +43,23 @@ void main()
 		vec4 specular = gl_FrontLightProduct[i].specular * power;
 		vec4 color = gl_FrontLightModelProduct.sceneColor + ambient + diffuse + specular;
 
+		vec4 d = vec4(surfaceNormal, 1.0);
+
 		if(diffuseEnabled)
-			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * color;
+			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * color; // * d;
 		else
-			diffuseColor += color;
+			diffuseColor += color * d;
+
+		
 	}
 
     gl_FragColor = diffuseColor;
-    gl_FragColor.a = materialAlpha;
+    gl_FragColor.a = 1.0;
 }
 
-void main2()
+
+
+void main()
 {
 	// fetch the normal from the normal map and modify it using the normal from the mesh
 	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb *  2.0 - 1.0;
@@ -108,4 +114,31 @@ void main2()
 	// output colors to buffer
 	gl_FragColor.rgb = (diffuseColor + specularColor).rgb * brightness;
 	gl_FragColor.a = diffuseColor.a;
+}
+
+void main4()
+{   
+	vec4 diffuseColor = vec4(0, 0, 0, 1);
+
+    vec3 n = normalize(normal);
+
+	for(int i = 0; i < gl_MaxLights; i++)
+	{
+		float nDotL = max(0.0, dot(n, gl_LightSource[i].position.xyz));
+		float nDotH = max(0.0, dot(normal, vec3(gl_LightSource[i].halfVector)));
+		float power = (nDotL == 0.0) ? 0.0 : pow(nDotH, gl_FrontMaterial.shininess);
+
+		vec4 ambient = gl_FrontLightProduct[i].ambient;
+		vec4 diffuse = gl_FrontLightProduct[i].diffuse * nDotL;
+		vec4 specular = gl_FrontLightProduct[i].specular * power;
+		vec4 color = gl_FrontLightModelProduct.sceneColor + ambient + diffuse + specular;
+
+		if(diffuseEnabled)
+			diffuseColor += texture2D(texDiffuse, gl_TexCoord[0].st) * color;
+		else
+			diffuseColor += color;
+	}
+
+    gl_FragColor = diffuseColor;
+    gl_FragColor.a = 1.0;
 }

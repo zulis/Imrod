@@ -8,7 +8,8 @@ varying vec3 bitangent;
 void main()
 {
 	// calculate view space position
-	vertex = gl_ModelViewMatrix * gl_Vertex;
+	//vertex = gl_ModelViewMatrix * gl_Vertex;
+	vertex = gl_Vertex;
 	
 	// transform the normal, tangent into eye space and normalize the result
 	normal = normalize(gl_NormalMatrix * gl_Normal);
