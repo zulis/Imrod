@@ -2,7 +2,6 @@
 #include "cinder/params/Params.h"
 #include "cinder/Camera.h"
 #include "cinder/MayaCamUI.h"
-#include "cinder/ObjLoader.h"
 #include "cinder/ImageIo.h"
 #include "cinder/gl/gl.h"
 #include "cinder/gl/GlslProg.h"
@@ -12,10 +11,13 @@
 #include "Debug.h"
 #include "FileMonitor.h"
 #include "Config.h"
+#include "AssimpLoader.h"
 
 using namespace ci;
 using namespace ci::app;
 using namespace std;
+using namespace mndl;
+using namespace mndl::assimp;
 
 #define DBG_INFO "Info"
 #define DBG_ERROR "Error"
@@ -41,14 +43,12 @@ private:
 	bool isInitialized() const
 	{
 		/*return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
-		        m_texEmissive && m_texNormal && m_texSpecular && m_texAO);*/
-		return (m_shader && m_mesh);
+		m_texEmissive && m_texNormal && m_texSpecular && m_texAO);*/
+		return (m_shader && m_assimpLoader.getNumMeshes() > 0);
 	}
 
 	CameraPersp m_camera;
 	MayaCamUI m_mayaCamera;
-	TriMesh m_triMesh;
-	gl::VboMeshRef m_mesh;
 	Matrix44f m_matrix;
 	gl::Light* m_light1;
 	gl::Light* m_light2;
@@ -74,6 +74,7 @@ private:
 	float m_brightness;
 	bool m_rotateMesh;
 	float m_time;
+	AssimpLoader m_assimpLoader;
 };
 
 void ImrodApp::prepareSettings(Settings* settings)
@@ -87,7 +88,7 @@ void ImrodApp::prepareSettings(Settings* settings)
 
 void ImrodApp::setup()
 {
-	loadModel("models/teapot/teapot.ini");
+	loadModel("models/barrel/barrel.ini");
 
 	setupCamera();
 
@@ -161,44 +162,66 @@ void ImrodApp::loadModel(const std::string& fileName)
 	{
 		Config meshCfg(fileName);
 
-		ObjLoader loader(loadAsset(meshCfg.getString("Model", "FileName")));
-		loader.load(&m_triMesh);
-
-		if(!m_triMesh.hasNormals())
-			m_triMesh.recalculateNormals();
-
-		if(!m_triMesh.hasTangents())
-			m_triMesh.recalculateTangents();
-
-		m_mesh = gl::VboMesh::create(m_triMesh);
+		m_assimpLoader = AssimpLoader(getAssetPath(meshCfg.getString("Model", "FileName")), false);
+		m_assimpLoader.setAnimation(0);
+		m_assimpLoader.enableTextures(false);
+		m_assimpLoader.enableSkinning(false);
+		m_assimpLoader.enableAnimation(false);
+		m_assimpLoader.enableMaterials(true);
 
 		meshCfg.setSection("Material");
 
+		if(m_texDiffuse)
+			m_texDiffuse = NULL;
+		if(m_texAO)
+			m_texAO = NULL;
+		if(m_texEmissive)
+			m_texEmissive = NULL;
+		if(m_texNormal)
+			m_texNormal = NULL;
+		if(m_texSpecular)
+			m_texSpecular = NULL;
+
+		m_diffuseEnabled = false;
+		m_aoEnabled = false;
+		m_emissiveEnabled = false;
+		m_normalEnabled = false;
+		m_specularEnabled = false;
+
 		std::string diffuseFileName = meshCfg.getString("Diffuse");
 		if(diffuseFileName != std::string())
+		{
 			m_texDiffuse = gl::Texture::create(loadImage(loadAsset(diffuseFileName)));
+			m_diffuseEnabled = true;
+		}
 
 		std::string aoFileName = meshCfg.getString("AO");
 		if(aoFileName != std::string())
+		{
 			m_texAO = gl::Texture::create(loadImage(loadAsset(aoFileName)));
+			m_aoEnabled = true;
+		}
 
 		std::string emissiveFileName = meshCfg.getString("Emissive");
 		if(emissiveFileName != std::string())
+		{
 			m_texEmissive = gl::Texture::create(loadImage(loadAsset(emissiveFileName)));
+			m_emissiveEnabled = true;
+		}
 
 		std::string normalFileName = meshCfg.getString("Normal");
 		if(normalFileName != std::string())
+		{
 			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
+			m_normalEnabled = true;
+		}
 
 		std::string specularFileName = meshCfg.getString("Specular");
 		if(specularFileName != std::string())
+		{
 			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
-
-		m_diffuseEnabled = m_texDiffuse != NULL;
-		m_aoEnabled = m_texAO != NULL;
-		m_emissiveEnabled = m_texEmissive != NULL;
-		m_normalEnabled = m_texNormal != NULL;
-		m_specularEnabled = m_texSpecular != NULL;
+			m_specularEnabled = true;
+		}
 
 		m_diffusePower = meshCfg.getFloat("DiffusePower");
 		m_aoPower = meshCfg.getFloat("AOPower");
@@ -252,6 +275,12 @@ void ImrodApp::update()
 	{
 		float rotateAngle = elapsed * 0.2f;
 		m_matrix.rotate(Vec3f::yAxis(), rotateAngle);
+	}
+
+	if(isInitialized())
+	{
+		m_assimpLoader.setTime(elapsed);
+		m_assimpLoader.update();
 	}
 }
 
@@ -312,7 +341,7 @@ void ImrodApp::draw()
 		// Render model
 		gl::pushModelView();
 		gl::multModelView(m_matrix);
-		gl::draw(m_mesh);
+		m_assimpLoader.draw();
 		gl::popModelView();
 
 		// Disable lights
@@ -393,8 +422,9 @@ void ImrodApp::fileDrop(FileDropEvent event)
 
 void ImrodApp::setupCamera()
 {
-	m_camera.setEyePoint(Vec3f(0.0f, 0.0f, 100.0f));
-	AxisAlignedBox3f bbox = m_triMesh.calcBoundingBox();
+	m_camera.setNearClip(0.1f);
+	m_camera.setFarClip(10000.0f);
+	AxisAlignedBox3f bbox = m_assimpLoader.getBoundingBox();
 	Vec3f size = bbox.getSize();
 	float max = size.x;
 	max = max < size.y ? size.y : max;

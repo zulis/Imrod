@@ -24,7 +24,7 @@ uniform float normalPower;
 uniform float specularPower;
 uniform float brightness;
 
-void main6()
+void main__()
 {   
 	// fetch the normal from the normal map and modify it using the normal from the mesh
 	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb *  2.0 - 1.0;
@@ -59,7 +59,7 @@ void main6()
 
 
 
-void main()
+void main_()
 {
 	// fetch the normal from the normal map and modify it using the normal from the mesh
 	vec3 mappedNormal = texture2D(texNormal, gl_TexCoord[0].st).rgb *  2.0 - 1.0;
@@ -116,7 +116,7 @@ void main()
 	gl_FragColor.a = diffuseColor.a;
 }
 
-void main4()
+void main()
 {   
 	vec4 diffuseColor = vec4(0, 0, 0, 1);
 
@@ -139,6 +139,6 @@ void main4()
 			diffuseColor += color;
 	}
 
-    gl_FragColor = diffuseColor;
+    gl_FragColor.rgb = diffuseColor.rgb;
     gl_FragColor.a = 1.0;
 }

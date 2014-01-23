@@ -50,7 +50,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\include;$(CINDER_HOME)\include;$(CINDER_HOME)\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;$(CINDER_HOME)\include;$(CINDER_HOME)\boost;$(LIBRARIES_HOME)\include\assimp;..\blocks\assimp</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;NOMINMAX;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -64,8 +64,8 @@
       <AdditionalIncludeDirectories>$(CINDER_HOME)\include;..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(CINDER_HOME)\lib\msw\$(PlatformTarget)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cinder-$(PlatformToolset)_d.lib;assimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(CINDER_HOME)\lib\msw\$(PlatformTarget);$(LIBRARIES_HOME)\lib\assimp\x86</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Windows</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
@@ -76,7 +76,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>..\include;$(CINDER_HOME)\include;$(CINDER_HOME)\boost</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\include;$(CINDER_HOME)\include;$(CINDER_HOME)\boost;$(LIBRARIES_HOME)\include\assimp;..\blocks\assimp</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;NOMINMAX;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader />
@@ -91,8 +91,8 @@
       <AdditionalIncludeDirectories>$(CINDER_HOME)\include;..\include</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Link>
-      <AdditionalDependencies>cinder-$(PlatformToolset).lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(CINDER_HOME)\lib\msw\$(PlatformTarget)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cinder-$(PlatformToolset).lib;assimp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(CINDER_HOME)\lib\msw\$(PlatformTarget);$(LIBRARIES_HOME)\lib\assimp\x86</AdditionalLibraryDirectories>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <GenerateMapFile>true</GenerateMapFile>
       <SubSystem>Windows</SubSystem>
@@ -107,9 +107,14 @@
     <ResourceCompile Include="Resources.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\blocks\assimp\AssimpLoader.cpp" />
+    <ClCompile Include="..\blocks\assimp\Node.cpp" />
     <ClCompile Include="..\src\ImrodApp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\blocks\assimp\AssimpLoader.h" />
+    <ClInclude Include="..\blocks\assimp\AssimpMesh.h" />
+    <ClInclude Include="..\blocks\assimp\Node.h" />
     <ClInclude Include="..\include\Debug.h" />
     <ClInclude Include="..\include\FileMonitor.h" />
     <ClInclude Include="..\include\Config.h" />

@@ -16,6 +16,12 @@
     <Filter Include="Shader Files">
       <UniqueIdentifier>{912f2a60-3617-442a-80a8-a3cbdf2c61c1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Blocks">
+      <UniqueIdentifier>{2fb70807-adda-44d7-aad7-f2abc0ee68d9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\Assimp">
+      <UniqueIdentifier>{cadc7d63-76e1-4503-956d-2ccb6080f96a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\ImrodApp.cpp">
@@ -27,6 +33,12 @@
     <ClInclude Include="..\include\Resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClCompile Include="..\blocks\assimp\AssimpLoader.cpp">
+      <Filter>Blocks\Assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\blocks\assimp\Node.cpp">
+      <Filter>Blocks\Assimp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\Resources.h">
@@ -40,6 +52,15 @@
     </ClInclude>
     <ClInclude Include="..\include\Config.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\blocks\assimp\AssimpLoader.h">
+      <Filter>Blocks\Assimp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\blocks\assimp\AssimpMesh.h">
+      <Filter>Blocks\Assimp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\blocks\assimp\Node.h">
+      <Filter>Blocks\Assimp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
