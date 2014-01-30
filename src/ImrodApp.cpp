@@ -88,7 +88,7 @@ void ImrodApp::prepareSettings(Settings* settings)
 
 void ImrodApp::setup()
 {
-	loadModel("models/barrel/barrel.ini");
+	loadModel("models/gaztank/gaztank.ini");
 
 	setupCamera();
 
