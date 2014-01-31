@@ -8,10 +8,12 @@
 #include "cinder/gl/Light.h"
 #include "cinder/gl/Texture.h"
 #include "cinder/gl/Vbo.h"
+#include "cinder/TriMesh.h"
 #include "Debug.h"
 #include "FileMonitor.h"
 #include "Config.h"
 #include "AssimpLoader.h"
+#include "cinder/ObjLoader.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -38,13 +40,14 @@ public:
 
 private:
 	void loadModel(const std::string& fileName);
-	void setupCamera();
+	void setupCamera(bool inTheMiddleOfY = false);
 	void loadShader();
 	bool isInitialized() const
 	{
 		/*return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
 		m_texEmissive && m_texNormal && m_texSpecular && m_texAO);*/
-		return (m_shader && m_assimpLoader.getNumMeshes() > 0);
+		//return (m_shader && m_assimpLoader.getNumMeshes() > 0);
+		return (m_shader && m_mesh);
 	}
 
 	CameraPersp m_camera;
@@ -75,6 +78,8 @@ private:
 	bool m_rotateMesh;
 	float m_time;
 	AssimpLoader m_assimpLoader;
+	gl::VboMeshRef m_mesh;
+	AxisAlignedBox3f m_bbox;
 };
 
 void ImrodApp::prepareSettings(Settings* settings)
@@ -94,13 +99,13 @@ void ImrodApp::setup()
 
 	// Create lights
 	m_light1 = new gl::Light(gl::Light::DIRECTIONAL, 0);
-	m_light1->setDirection(Vec3f(0, 1, 1).normalized());
+	m_light1->setDirection(Vec3f(0, 0, 1).normalized());
 	m_light1->setAmbient(Color(0.0f, 0.0f, 0.1f));
 	m_light1->setDiffuse(Color(0.9f, 0.6f, 0.3f));
 	m_light1->setSpecular(Color(0.9f, 0.6f, 0.3f));
 
 	m_light2 = new gl::Light(gl::Light::DIRECTIONAL, 1);
-	m_light2->setDirection(Vec3f(0, 1, -1).normalized());
+	m_light2->setDirection(Vec3f(0, 0, -1).normalized());
 	m_light2->setAmbient(Color(0.0f, 0.0f, 0.0f));
 	m_light2->setDiffuse(Color(0.2f, 0.6f, 1.0f));
 	m_light2->setSpecular(Color(0.2f, 0.2f, 0.2f));
@@ -168,6 +173,27 @@ void ImrodApp::loadModel(const std::string& fileName)
 		m_assimpLoader.enableSkinning(false);
 		m_assimpLoader.enableAnimation(false);
 		m_assimpLoader.enableMaterials(true);
+
+		//////////////////////////////////////////////////////////////////////////
+		TriMesh triMesh;
+		auto a = meshCfg.getString("Model", "FileName");
+		auto b = fs::path(getAssetPath(a));
+		if(fs::exists(b))
+		{
+			ObjLoader loader(loadFile(b));
+			loader.load(&triMesh, true);
+		}
+
+		if(!triMesh.hasNormals())
+			triMesh.recalculateNormals();
+
+		if(!triMesh.hasTangents())
+			triMesh.recalculateTangents();
+
+		m_bbox = triMesh.calcBoundingBox();
+
+		m_mesh = gl::VboMesh::create(triMesh);
+		//////////////////////////////////////////////////////////////////////////
 
 		meshCfg.setSection("Material");
 
@@ -334,6 +360,17 @@ void ImrodApp::draw()
 		m_shader->uniform("specularPower", m_specularPower);
 		m_shader->uniform("brightness", m_brightness);
 
+		//m_shader->uniform("maxLights", 1);
+		//m_shader->uniform("lights[0].Position", Vec4f(0.0f, 1.0f, 1.0f, 0.0f)); // w == 0.0f <- directional
+		//m_shader->uniform("lights[0].Intensity", Vec3f(1.0f, 1.0f, 1.0f));
+		//m_shader->uniform("lights[1].Position", Vec4f(0.0f, 1.0f, -1.0f, 0.0f));
+		//m_shader->uniform("lights[1].Intensity", Vec3f(1.0f, 1.0f, 1.0f));
+
+		m_shader->uniform("material.Kd", Vec3f(0.9f, 0.9f, 0.9f));
+		m_shader->uniform("material.Ks", Vec3f(0.95f, 0.95f, 0.95f));
+		m_shader->uniform("material.Ka", Vec3f(0.1f, 0.1f, 0.1f));
+		m_shader->uniform("material.Shininess", 100.0f);
+
 		// Enable lights
 		m_light1->enable();
 		m_light2->enable();
@@ -341,7 +378,8 @@ void ImrodApp::draw()
 		// Render model
 		gl::pushModelView();
 		gl::multModelView(m_matrix);
-		m_assimpLoader.draw();
+		//m_assimpLoader.draw();
+		gl::draw(m_mesh);
 		gl::popModelView();
 
 		// Disable lights
@@ -411,6 +449,11 @@ void ImrodApp::keyDown(KeyEvent event)
 			m_rotateMesh = !m_rotateMesh;
 			break;
 		}
+		case KeyEvent::KEY_c:
+		{
+			setupCamera(true);
+			break;
+		}
 	}
 }
 
@@ -420,17 +463,36 @@ void ImrodApp::fileDrop(FileDropEvent event)
 	setupCamera();
 }
 
-void ImrodApp::setupCamera()
+void ImrodApp::setupCamera(bool inTheMiddleOfY)
 {
 	m_camera.setNearClip(0.1f);
+	m_camera.setFarClip(10000.0f);
+	Vec3f size = m_bbox.getSize();
+	float max = size.x;
+	max = max < size.y ? size.y : max;
+	max = max < size.z ? size.z : max;
+
+	if(inTheMiddleOfY)
+		m_camera.setEyePoint(Vec3f(0.0f, size.y / 2, max * 2.0f));
+	else
+		m_camera.setEyePoint(Vec3f(0.0f, max, max * 2.0f));
+
+	m_camera.setCenterOfInterestPoint(m_bbox.getCenter());
+
+	/*m_camera.setNearClip(0.1f);
 	m_camera.setFarClip(10000.0f);
 	AxisAlignedBox3f bbox = m_assimpLoader.getBoundingBox();
 	Vec3f size = bbox.getSize();
 	float max = size.x;
 	max = max < size.y ? size.y : max;
 	max = max < size.z ? size.z : max;
+
+	if(inTheMiddleOfY)
+	m_camera.setEyePoint(Vec3f(0.0f, size.y / 2, max * 2.0f));
+	else
 	m_camera.setEyePoint(Vec3f(0.0f, max, max * 2.0f));
-	m_camera.setCenterOfInterestPoint(bbox.getCenter());
+
+	m_camera.setCenterOfInterestPoint(bbox.getCenter());*/
 }
 
 CINDER_APP_NATIVE(ImrodApp, RendererGl)
