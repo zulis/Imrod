@@ -7,13 +7,10 @@
 #include "cinder/gl/GlslProg.h"
 #include "cinder/gl/Light.h"
 #include "cinder/gl/Texture.h"
-#include "cinder/gl/Vbo.h"
-#include "cinder/TriMesh.h"
 #include "Debug.h"
 #include "FileMonitor.h"
 #include "Config.h"
 #include "AssimpLoader.h"
-#include "cinder/ObjLoader.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -24,7 +21,7 @@ using namespace mndl::assimp;
 #define DBG_INFO "Info"
 #define DBG_ERROR "Error"
 
-class ImrodApp : public AppNative
+class MeshViewApp : public AppNative
 {
 public:
 	void prepareSettings(Settings* settings);
@@ -44,10 +41,7 @@ private:
 	void loadShader();
 	bool isInitialized() const
 	{
-		/*return (m_mesh && m_shader && m_light1 && m_light2 && m_texDiffuse &&
-		m_texEmissive && m_texNormal && m_texSpecular && m_texAO);*/
-		//return (m_shader && m_assimpLoader.getNumMeshes() > 0);
-		return (m_shader && m_mesh);
+		return (m_shader && m_assimpLoader.getNumMeshes() > 0);
 	}
 
 	CameraPersp m_camera;
@@ -57,10 +51,14 @@ private:
 	gl::Light* m_light2;
 	gl::GlslProgRef m_shader;
 	gl::TextureRef m_texDiffuse;
-	gl::TextureRef m_texAO;
-	gl::TextureRef m_texEmissive;
 	gl::TextureRef m_texNormal;
 	gl::TextureRef m_texSpecular;
+	gl::TextureRef m_texAO;
+	gl::TextureRef m_texEmissive;
+	Vec3f m_matAmbient;
+	Vec3f m_matDiffuse;
+	Vec3f m_matSpecular;
+	float m_matShininess;
 	FileMonitorRef m_fileMonitorVert;
 	FileMonitorRef m_fileMonitorFrag;
 	params::InterfaceGlRef m_params;
@@ -69,29 +67,22 @@ private:
 	bool m_emissiveEnabled;
 	bool m_normalEnabled;
 	bool m_specularEnabled;
-	float m_diffusePower;
-	float m_aoPower;
-	float m_emissivePower;
-	float m_normalPower;
-	float m_specularPower;
-	float m_brightness;
+	float m_gamma;
 	bool m_rotateMesh;
 	float m_time;
 	AssimpLoader m_assimpLoader;
-	gl::VboMeshRef m_mesh;
-	AxisAlignedBox3f m_bbox;
 };
 
-void ImrodApp::prepareSettings(Settings* settings)
+void MeshViewApp::prepareSettings(Settings* settings)
 {
 	settings->setWindowSize(1024, 768);
-	settings->setTitle("Imrod");
+	settings->setTitle("Mesh view");
 
 	m_light1 = NULL;
 	m_light2 = NULL;
 }
 
-void ImrodApp::setup()
+void MeshViewApp::setup()
 {
 	loadModel("models/gaztank/gaztank.ini");
 
@@ -122,7 +113,7 @@ void ImrodApp::setup()
 	m_rotateMesh = false;
 
 	// Create a parameter window
-	m_params = params::InterfaceGl::create(getWindow(), "Imrod demo", Vec2i(220, 320));
+	m_params = params::InterfaceGl::create(getWindow(), "Properties", Vec2i(180, 240));
 	m_params->addText("LMB + drag - rotate");
 	m_params->addText("RMB + drag - zoom");
 	m_params->addSeparator();
@@ -130,22 +121,17 @@ void ImrodApp::setup()
 	m_params->addParam("Auto rotate", &m_rotateMesh);
 	m_params->addSeparator();
 	m_params->addParam("Diffuse", &m_diffuseEnabled);
-	m_params->addParam("Diffuse power", &m_diffusePower, "min=0.0 max=10.0 step=0.1");
-	m_params->addParam("AO Map", &m_aoEnabled);
-	m_params->addParam("AO power", &m_aoPower, "min=0.0 max=10.0 step=0.1");
-	m_params->addParam("Emissive Map", &m_emissiveEnabled);
-	m_params->addParam("Emissive power", &m_emissivePower, "min=0.0 max=10.0 step=0.1");
-	m_params->addParam("Normal Map", &m_normalEnabled);
-	m_params->addParam("Normal power", &m_normalPower, "min=0.0 max=10.0 step=0.1");
-	m_params->addParam("Specular Map", &m_specularEnabled);
-	m_params->addParam("Specular power", &m_specularPower, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("Normal", &m_normalEnabled);
+	m_params->addParam("Specular", &m_specularEnabled);
+	m_params->addParam("AO", &m_aoEnabled);
+	m_params->addParam("Emissive", &m_emissiveEnabled);
 	m_params->addSeparator();
-	m_params->addParam("Brightness", &m_brightness, "min=0.0 max=10.0 step=0.1");
+	m_params->addParam("Gamma", &m_gamma, "min=0.0 max=10.0 step=0.1");
 
 	m_time = (float)getElapsedSeconds();
 }
 
-void ImrodApp::shutdown()
+void MeshViewApp::shutdown()
 {
 	// Safely delete lights
 	if(m_light1)
@@ -161,7 +147,7 @@ void ImrodApp::shutdown()
 	}
 }
 
-void ImrodApp::loadModel(const std::string& fileName)
+void MeshViewApp::loadModel(const std::string& fileName)
 {
 	try
 	{
@@ -172,30 +158,9 @@ void ImrodApp::loadModel(const std::string& fileName)
 		m_assimpLoader.enableTextures(false);
 		m_assimpLoader.enableSkinning(false);
 		m_assimpLoader.enableAnimation(false);
-		m_assimpLoader.enableMaterials(true);
+		m_assimpLoader.enableMaterials(false);
 
-		//////////////////////////////////////////////////////////////////////////
-		TriMesh triMesh;
-		auto a = meshCfg.getString("Model", "FileName");
-		auto b = fs::path(getAssetPath(a));
-		if(fs::exists(b))
-		{
-			ObjLoader loader(loadFile(b));
-			loader.load(&triMesh, true);
-		}
-
-		if(!triMesh.hasNormals())
-			triMesh.recalculateNormals();
-
-		if(!triMesh.hasTangents())
-			triMesh.recalculateTangents();
-
-		m_bbox = triMesh.calcBoundingBox();
-
-		m_mesh = gl::VboMesh::create(triMesh);
-		//////////////////////////////////////////////////////////////////////////
-
-		meshCfg.setSection("Material");
+		meshCfg.setSection("Textures");
 
 		if(m_texDiffuse)
 			m_texDiffuse = NULL;
@@ -221,6 +186,20 @@ void ImrodApp::loadModel(const std::string& fileName)
 			m_diffuseEnabled = true;
 		}
 
+		std::string normalFileName = meshCfg.getString("Normal");
+		if (normalFileName != std::string())
+		{
+			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
+			m_normalEnabled = true;
+		}
+
+		std::string specularFileName = meshCfg.getString("Specular");
+		if (specularFileName != std::string())
+		{
+			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
+			m_specularEnabled = true;
+		}
+
 		std::string aoFileName = meshCfg.getString("AO");
 		if(aoFileName != std::string())
 		{
@@ -235,26 +214,12 @@ void ImrodApp::loadModel(const std::string& fileName)
 			m_emissiveEnabled = true;
 		}
 
-		std::string normalFileName = meshCfg.getString("Normal");
-		if(normalFileName != std::string())
-		{
-			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
-			m_normalEnabled = true;
-		}
-
-		std::string specularFileName = meshCfg.getString("Specular");
-		if(specularFileName != std::string())
-		{
-			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
-			m_specularEnabled = true;
-		}
-
-		m_diffusePower = meshCfg.getFloat("DiffusePower");
-		m_aoPower = meshCfg.getFloat("AOPower");
-		m_emissivePower = meshCfg.getFloat("EmissivePower");
-		m_normalPower = meshCfg.getFloat("NormalPower");
-		m_specularPower = meshCfg.getFloat("SpecularPower");
-		m_brightness = meshCfg.getFloat("Brightness");
+		meshCfg.setSection("Material");
+		m_matAmbient = meshCfg.getVec3f("Ambient");
+		m_matDiffuse = meshCfg.getVec3f("Diffuse");
+		m_matSpecular = meshCfg.getVec3f("Specular");
+		m_matShininess = meshCfg.getFloat("Shininess");
+		m_gamma = meshCfg.getFloat("Gamma");
 	}
 	catch(const std::exception& e)
 	{
@@ -263,7 +228,7 @@ void ImrodApp::loadModel(const std::string& fileName)
 	}
 }
 
-void ImrodApp::loadShader()
+void MeshViewApp::loadShader()
 {
 	DBG_REMOVE(DBG_INFO);
 	DBG_REMOVE(DBG_ERROR);
@@ -286,7 +251,7 @@ void ImrodApp::loadShader()
 	}
 }
 
-void ImrodApp::update()
+void MeshViewApp::update()
 {
 	// Track the time
 	float elapsed = (float) getElapsedSeconds() - m_time;
@@ -310,7 +275,7 @@ void ImrodApp::update()
 	}
 }
 
-void ImrodApp::draw()
+void MeshViewApp::draw()
 {
 	// Clear the window
 	gl::clear();
@@ -329,47 +294,36 @@ void ImrodApp::draw()
 		if(m_texDiffuse)
 			m_texDiffuse->enableAndBind();
 
+		if (m_texNormal)
+			m_texNormal->bind(1);
+
+		if (m_texSpecular)
+			m_texSpecular->bind(2);
+
 		if(m_texAO)
-			m_texAO->bind(1);
+			m_texAO->bind(3);
 
 		if(m_texEmissive)
-			m_texEmissive->bind(2);
-
-		if(m_texNormal)
-			m_texNormal->bind(3);
-
-		if(m_texSpecular)
-			m_texSpecular->bind(4);
+			m_texEmissive->bind(4);
 
 		// Bind shader
 		m_shader->bind();
 		m_shader->uniform("texDiffuse", 0);
-		m_shader->uniform("texAO", 1);
-		m_shader->uniform("texEmissive", 2);
-		m_shader->uniform("texNormal", 3);
-		m_shader->uniform("texSpecular", 4);
+		m_shader->uniform("texNormal", 1);
+		m_shader->uniform("texSpecular", 2);
+		m_shader->uniform("texAO", 3);
+		m_shader->uniform("texEmissive", 4);
 		m_shader->uniform("diffuseEnabled", m_diffuseEnabled);
-		m_shader->uniform("aoEnabled", m_aoEnabled);
-		m_shader->uniform("emissiveEnabled", m_emissiveEnabled);
 		m_shader->uniform("normalEnabled", m_normalEnabled);
 		m_shader->uniform("specularEnabled", m_specularEnabled);
-		m_shader->uniform("diffusePower", m_diffusePower);
-		m_shader->uniform("aoPower", m_aoPower);
-		m_shader->uniform("emissivePower", m_emissivePower);
-		m_shader->uniform("normalPower", m_normalPower);
-		m_shader->uniform("specularPower", m_specularPower);
-		m_shader->uniform("brightness", m_brightness);
+		m_shader->uniform("aoEnabled", m_aoEnabled);
+		m_shader->uniform("emissiveEnabled", m_emissiveEnabled);
 
-		//m_shader->uniform("maxLights", 1);
-		//m_shader->uniform("lights[0].Position", Vec4f(0.0f, 1.0f, 1.0f, 0.0f)); // w == 0.0f <- directional
-		//m_shader->uniform("lights[0].Intensity", Vec3f(1.0f, 1.0f, 1.0f));
-		//m_shader->uniform("lights[1].Position", Vec4f(0.0f, 1.0f, -1.0f, 0.0f));
-		//m_shader->uniform("lights[1].Intensity", Vec3f(1.0f, 1.0f, 1.0f));
-
-		m_shader->uniform("material.Kd", Vec3f(0.9f, 0.9f, 0.9f));
-		m_shader->uniform("material.Ks", Vec3f(0.95f, 0.95f, 0.95f));
-		m_shader->uniform("material.Ka", Vec3f(0.1f, 0.1f, 0.1f));
-		m_shader->uniform("material.Shininess", 100.0f);
+		m_shader->uniform("material.Ka", m_matAmbient);
+		m_shader->uniform("material.Kd", m_matDiffuse);
+		m_shader->uniform("material.Ks", m_matSpecular);
+		m_shader->uniform("material.Shininess", m_matShininess);
+		m_shader->uniform("gamma", m_gamma);
 
 		// Enable lights
 		m_light1->enable();
@@ -378,8 +332,7 @@ void ImrodApp::draw()
 		// Render model
 		gl::pushModelView();
 		gl::multModelView(m_matrix);
-		//m_assimpLoader.draw();
-		gl::draw(m_mesh);
+		m_assimpLoader.draw();
 		gl::popModelView();
 
 		// Disable lights
@@ -412,25 +365,25 @@ void ImrodApp::draw()
 	Debug::get().draw(ColorAf::white());
 }
 
-void ImrodApp::resize()
+void MeshViewApp::resize()
 {
 	m_camera.setAspectRatio(getWindowAspectRatio());
 	m_mayaCamera.setCurrentCam(m_camera);
 }
 
-void ImrodApp::mouseDown(MouseEvent event)
+void MeshViewApp::mouseDown(MouseEvent event)
 {
 	m_mayaCamera.setCurrentCam(m_camera);
 	m_mayaCamera.mouseDown(event.getPos());
 }
 
-void ImrodApp::mouseDrag(MouseEvent event)
+void MeshViewApp::mouseDrag(MouseEvent event)
 {
 	m_mayaCamera.mouseDrag(event.getPos(), event.isLeftDown(), event.isMiddleDown(), event.isRightDown());
 	m_camera = m_mayaCamera.getCamera();
 }
 
-void ImrodApp::keyDown(KeyEvent event)
+void MeshViewApp::keyDown(KeyEvent event)
 {
 	switch(event.getCode())
 	{
@@ -457,29 +410,15 @@ void ImrodApp::keyDown(KeyEvent event)
 	}
 }
 
-void ImrodApp::fileDrop(FileDropEvent event)
+void MeshViewApp::fileDrop(FileDropEvent event)
 {
 	loadModel(event.getFile(0).string());
 	setupCamera();
 }
 
-void ImrodApp::setupCamera(bool inTheMiddleOfY)
+void MeshViewApp::setupCamera(bool inTheMiddleOfY)
 {
 	m_camera.setNearClip(0.1f);
-	m_camera.setFarClip(10000.0f);
-	Vec3f size = m_bbox.getSize();
-	float max = size.x;
-	max = max < size.y ? size.y : max;
-	max = max < size.z ? size.z : max;
-
-	if(inTheMiddleOfY)
-		m_camera.setEyePoint(Vec3f(0.0f, size.y / 2, max * 2.0f));
-	else
-		m_camera.setEyePoint(Vec3f(0.0f, max, max * 2.0f));
-
-	m_camera.setCenterOfInterestPoint(m_bbox.getCenter());
-
-	/*m_camera.setNearClip(0.1f);
 	m_camera.setFarClip(10000.0f);
 	AxisAlignedBox3f bbox = m_assimpLoader.getBoundingBox();
 	Vec3f size = bbox.getSize();
@@ -492,7 +431,7 @@ void ImrodApp::setupCamera(bool inTheMiddleOfY)
 	else
 	m_camera.setEyePoint(Vec3f(0.0f, max, max * 2.0f));
 
-	m_camera.setCenterOfInterestPoint(bbox.getCenter());*/
+	m_camera.setCenterOfInterestPoint(bbox.getCenter());
 }
 
-CINDER_APP_NATIVE(ImrodApp, RendererGl)
+CINDER_APP_NATIVE(MeshViewApp, RendererGl)

@@ -1,13 +1,15 @@
+#version 120
+
 varying vec4 position;
 varying vec3 normal;
 varying vec3 tangent;
 varying vec3 bitangent;
 
 uniform sampler2D texDiffuse;
-uniform sampler2D texAO;
-uniform sampler2D texEmissive;
 uniform sampler2D texNormal;
 uniform sampler2D texSpecular;
+uniform sampler2D texAO;
+uniform sampler2D texEmissive;
 
 uniform bool diffuseEnabled;
 uniform bool aoEnabled;
@@ -15,22 +17,8 @@ uniform bool emissiveEnabled;
 uniform bool normalEnabled;
 uniform bool specularEnabled;
 
-uniform float diffusePower;
-uniform float aoPower;
-uniform float emissivePower;
-uniform float normalPower;
-uniform float specularPower;
-uniform float brightness;
+uniform float gamma;
 
-///////////////////////
-uniform int maxLights;
-struct LightInfo {
-	vec4 Position;  // Light position in eye coords.
-	vec3 Intensity; // A,D,S intensity
-};
-uniform LightInfo lights[2]; //gl_MaxLights
-
-// Material parameters
 struct MaterialInfo {
   vec3 Ka;            // Ambient reflectivity
   vec3 Kd;            // Diffuse reflectivity
@@ -42,29 +30,23 @@ uniform MaterialInfo material;
 void phongModel(int lightIndex, vec3 toCamera, vec3 pos, vec3 norm, out vec3 ambAndDiff, out vec3 spec)
 {
 	vec3 toLight;
-	if(lights[lightIndex].Position.w == 0.0)
+	if(gl_LightSource[lightIndex].position.w == 0.0)
 		toLight = normalize(gl_LightSource[lightIndex].position.xyz);
 	else
 		toLight = normalize(gl_LightSource[lightIndex].position.xyz - pos);
 
-	//vec3 n = normalize(norm);
-	//vec3 v = normalize(-pos.xyz);
-	//vec3 halfWay = normalize(toCamera + toLight);
 	vec3 reflect = normalize(reflect(-toLight, norm));
-	//vec3 ambient = vec3(gl_LightSource[lightIndex].ambient) * material.Ka;
+	vec3 ambient = vec3(gl_LightSource[lightIndex].ambient) * material.Ka;
 	float sDotN = max(dot(toLight, norm), 0.0);
-	sDotN = clamp(sDotN, 0.1, 1.0);
-    vec3 diffuse = gl_LightSource[lightIndex].diffuse * material.Kd * sDotN; //clamp(sDotN, 0.1, 1.0);
+	//sDotN = clamp(sDotN, 0.1, 1.0);
+    vec3 diffuse = vec3(gl_LightSource[lightIndex].diffuse) * material.Kd * sDotN;
 
-	//vec3 diffuse = vec3(gl_LightSource[lightIndex].diffuse) * material.Kd * max(dot(norm, toLight), 0.0);
-    
 	spec = vec3(0.0);
     if(sDotN > 0.0)
        spec = vec3(gl_LightSource[lightIndex].specular) * material.Ks *
-              pow(max(dot(reflect, toCamera/*halfWay, n*/), 0.0), material.Shininess);
-	spec = clamp(spec, 0.0, 1.0);
+              pow(max(dot(reflect, toCamera), 0.0), material.Shininess);
 
-	ambAndDiff = /*ambient +*/ diffuse;
+	ambAndDiff = ambient + diffuse;
 }
 
 void main()
@@ -84,21 +66,15 @@ void main()
 
 		if(diffuseEnabled)
 		{
-			//finalColor += (vec4(ambAndDiff, 1.0) * diffuseColor) + vec4(spec, 1.0);
-			finalColor.rgb = surfaceNormal;
-			finalColor.a = 1.0f;
+			finalColor += (vec4(ambAndDiff, 1.0) * diffuseColor) + vec4(spec, 1.0);
+			//finalColor.rgb = surfaceNormal;
+			//finalColor.a = 1.0f;
 		}
 		else
 			finalColor += vec4(ambAndDiff, 1.0) + vec4(spec, 1.0);
 	}
 
-    gl_FragColor = finalColor;
-	//gl_FragColor.rgb = tangent;
-	//gl_FragColor.a = 1.0f;
-
-	//final color (after gamma correction)
-    //vec3 gamma = vec3(1.0/2.2);
-    //finalColor = vec4(pow(linearColor, gamma), surfaceColor.a);
+	gl_FragColor = vec4(pow(finalColor.rgb, vec3(1.0/gamma)), finalColor.a);
 }
 
 /*

@@ -27,6 +27,7 @@
 #include "cinder/TriMesh.h"
 #include "cinder/gl/Material.h"
 #include "cinder/gl/Texture.h"
+#include "cinder/gl/Vbo.h"
 
 namespace mndl
 {
@@ -53,6 +54,7 @@ class AssimpMesh
 
 		std::string mName;
 		ci::TriMesh mCachedTriMesh;
+		ci::gl::VboMeshRef mCachedVboMesh;
 		bool mValidCache;
 };
 

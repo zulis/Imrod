@@ -27,9 +27,6 @@
     <ClCompile Include="..\src\ImrodApp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\ImrodApp.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClInclude Include="..\include\Resources.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -38,6 +35,9 @@
     </ClCompile>
     <ClCompile Include="..\blocks\assimp\Node.cpp">
       <Filter>Blocks\Assimp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\MeshViewApp.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

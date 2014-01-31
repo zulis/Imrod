@@ -415,6 +415,7 @@ AssimpMeshRef AssimpLoader::convertAiMesh(const aiMesh* mesh)
 
 	assimpMeshRef->mAiMesh = mesh;
 	fromAssimp(mesh, &assimpMeshRef->mCachedTriMesh);
+	assimpMeshRef->mCachedVboMesh = ci::gl::VboMesh::create(assimpMeshRef->mCachedTriMesh);
 	assimpMeshRef->mValidCache = true;
 	assimpMeshRef->mAnimatedPos.resize(mesh->mNumVertices);
 	if(mesh->HasNormals())
@@ -872,7 +873,8 @@ void AssimpLoader::draw()
 			else
 				gl::disable(GL_CULL_FACE);
 
-			gl::draw(assimpMeshRef->mCachedTriMesh);
+			//gl::draw(assimpMeshRef->mCachedTriMesh);
+			gl::draw(assimpMeshRef->mCachedVboMesh);
 
 			// Texture Binding
 			if(mTexturesEnabled && assimpMeshRef->mTexture)
