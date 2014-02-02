@@ -36,9 +36,9 @@ public:
 	void fileDrop(FileDropEvent event);
 
 private:
-	void loadModel(const std::string& fileName);
+	void loadConfig(const std::string& fileName, bool isReload = false);
 	void setupCamera(bool inTheMiddleOfY = false);
-	void loadShader();
+	void loadShader(const std::string& fileName);
 	bool isInitialized() const
 	{
 		return (m_shader && m_assimpLoader.getNumMeshes() > 0);
@@ -61,16 +61,24 @@ private:
 	float m_matShininess;
 	FileMonitorRef m_fileMonitorVert;
 	FileMonitorRef m_fileMonitorFrag;
+	FileMonitorRef m_fileMonitorConfig;
 	params::InterfaceGlRef m_params;
 	bool m_diffuseEnabled;
 	bool m_aoEnabled;
 	bool m_emissiveEnabled;
 	bool m_normalEnabled;
 	bool m_specularEnabled;
+	float m_texDiffusePower;
+	float m_texNormalPower;
+	float m_texSpecularPower;
+	float m_texAOPower;
+	float m_texEmissivePower;
 	float m_gamma;
 	bool m_rotateMesh;
 	float m_time;
 	AssimpLoader m_assimpLoader;
+	std::string m_configFileName;
+	std::string m_shaderFileName;
 };
 
 void MeshViewApp::prepareSettings(Settings* settings)
@@ -84,7 +92,7 @@ void MeshViewApp::prepareSettings(Settings* settings)
 
 void MeshViewApp::setup()
 {
-	loadModel("models/gaztank/gaztank.ini");
+	loadConfig("configs/gaztank.ini");
 
 	setupCamera();
 
@@ -100,9 +108,6 @@ void MeshViewApp::setup()
 	m_light2->setAmbient(Color(0.0f, 0.0f, 0.0f));
 	m_light2->setDiffuse(Color(0.2f, 0.6f, 1.0f));
 	m_light2->setSpecular(Color(0.2f, 0.2f, 0.2f));
-
-	// Load shader
-	loadShader();
 
 	// Setup matrix
 	m_matrix.setToIdentity();
@@ -147,31 +152,49 @@ void MeshViewApp::shutdown()
 	}
 }
 
-void MeshViewApp::loadModel(const std::string& fileName)
+void MeshViewApp::loadConfig(const std::string& fileName, bool isReload)
 {
 	try
 	{
-		Config meshCfg(fileName);
+		if (fs::exists(fileName))
+			m_configFileName = fileName; 
+		else
+			m_configFileName = getAssetPath(fileName).string();
 
-		m_assimpLoader = AssimpLoader(getAssetPath(meshCfg.getString("Model", "FileName")), false);
-		m_assimpLoader.setAnimation(0);
-		m_assimpLoader.enableTextures(false);
-		m_assimpLoader.enableSkinning(false);
-		m_assimpLoader.enableAnimation(false);
-		m_assimpLoader.enableMaterials(false);
+		m_fileMonitorConfig = FileMonitor::create(m_configFileName);
+
+		Config meshCfg(m_configFileName);
+		m_shaderFileName = meshCfg.getString("Shader", "FileName");
+		loadShader(m_shaderFileName);
+
+		if (!isReload)
+		{
+			m_assimpLoader = AssimpLoader(getAssetPath(meshCfg.getString("Model", "FileName")), false);
+			m_assimpLoader.setAnimation(0);
+			m_assimpLoader.enableTextures(false);
+			m_assimpLoader.enableSkinning(false);
+			m_assimpLoader.enableAnimation(false);
+			m_assimpLoader.enableMaterials(false);
+		}
 
 		meshCfg.setSection("Textures");
 
 		if(m_texDiffuse)
 			m_texDiffuse = NULL;
+		if (m_texNormal)
+			m_texNormal = NULL;
+		if (m_texSpecular)
+			m_texSpecular = NULL;
 		if(m_texAO)
 			m_texAO = NULL;
 		if(m_texEmissive)
 			m_texEmissive = NULL;
-		if(m_texNormal)
-			m_texNormal = NULL;
-		if(m_texSpecular)
-			m_texSpecular = NULL;
+
+		m_texDiffusePower = 1.0f;
+		m_texNormalPower = 1.0f;
+		m_texSpecularPower = 1.0f;
+		m_texAOPower = 1.0f;
+		m_texEmissivePower = 1.0f;
 
 		m_diffuseEnabled = false;
 		m_aoEnabled = false;
@@ -183,6 +206,7 @@ void MeshViewApp::loadModel(const std::string& fileName)
 		if(diffuseFileName != std::string())
 		{
 			m_texDiffuse = gl::Texture::create(loadImage(loadAsset(diffuseFileName)));
+			m_texDiffusePower = meshCfg.getFloat("DiffusePower");
 			m_diffuseEnabled = true;
 		}
 
@@ -190,6 +214,7 @@ void MeshViewApp::loadModel(const std::string& fileName)
 		if (normalFileName != std::string())
 		{
 			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
+			m_texNormalPower = meshCfg.getFloat("NormalPower");
 			m_normalEnabled = true;
 		}
 
@@ -197,6 +222,7 @@ void MeshViewApp::loadModel(const std::string& fileName)
 		if (specularFileName != std::string())
 		{
 			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
+			m_texSpecularPower = meshCfg.getFloat("SpecularPower");
 			m_specularEnabled = true;
 		}
 
@@ -204,6 +230,7 @@ void MeshViewApp::loadModel(const std::string& fileName)
 		if(aoFileName != std::string())
 		{
 			m_texAO = gl::Texture::create(loadImage(loadAsset(aoFileName)));
+			m_texAOPower = meshCfg.getFloat("AOPower");
 			m_aoEnabled = true;
 		}
 
@@ -211,6 +238,7 @@ void MeshViewApp::loadModel(const std::string& fileName)
 		if(emissiveFileName != std::string())
 		{
 			m_texEmissive = gl::Texture::create(loadImage(loadAsset(emissiveFileName)));
+			m_texEmissivePower = meshCfg.getFloat("EmissivePower");
 			m_emissiveEnabled = true;
 		}
 
@@ -228,16 +256,19 @@ void MeshViewApp::loadModel(const std::string& fileName)
 	}
 }
 
-void MeshViewApp::loadShader()
+void MeshViewApp::loadShader(const std::string& fileName)
 {
 	DBG_REMOVE(DBG_INFO);
 	DBG_REMOVE(DBG_ERROR);
 
 	try
 	{
-		m_fileMonitorVert = FileMonitor::create(getAssetPath("shaders/mesh.vert"));
-		m_fileMonitorFrag = FileMonitor::create(getAssetPath("shaders/mesh.frag"));
-		m_shader = gl::GlslProg::create(loadAsset("shaders/mesh.vert"), loadAsset("shaders/mesh.frag"));
+		std::string vertexFile = fileName + ".vert";
+		std::string fragmentFile = fileName + ".frag";
+
+		m_fileMonitorVert = FileMonitor::create(getAssetPath(vertexFile));
+		m_fileMonitorFrag = FileMonitor::create(getAssetPath(fragmentFile));
+		m_shader = gl::GlslProg::create(loadAsset(vertexFile), loadAsset(fragmentFile));
 		const std::string log = m_shader->getShaderLog(m_shader->getHandle());
 
 		if(log != std::string())
@@ -257,9 +288,14 @@ void MeshViewApp::update()
 	float elapsed = (float) getElapsedSeconds() - m_time;
 	m_time += elapsed;
 
+	if (m_fileMonitorConfig->hasChanged())
+	{
+		loadConfig(m_configFileName, true);
+	}
+
 	if(m_fileMonitorVert->hasChanged() || m_fileMonitorFrag->hasChanged())
 	{
-		loadShader();
+		loadShader(m_shaderFileName);
 	}
 
 	if(m_rotateMesh)
@@ -313,6 +349,11 @@ void MeshViewApp::draw()
 		m_shader->uniform("texSpecular", 2);
 		m_shader->uniform("texAO", 3);
 		m_shader->uniform("texEmissive", 4);
+		m_shader->uniform("texDiffusePower", m_texDiffusePower);
+		m_shader->uniform("texNormalPower", m_texNormalPower);
+		m_shader->uniform("texSpecularPower", m_texSpecularPower);
+		m_shader->uniform("texAOPower", m_texAOPower);
+		m_shader->uniform("texEmissivePower", m_texEmissivePower);
 		m_shader->uniform("diffuseEnabled", m_diffuseEnabled);
 		m_shader->uniform("normalEnabled", m_normalEnabled);
 		m_shader->uniform("specularEnabled", m_specularEnabled);
@@ -412,7 +453,7 @@ void MeshViewApp::keyDown(KeyEvent event)
 
 void MeshViewApp::fileDrop(FileDropEvent event)
 {
-	loadModel(event.getFile(0).string());
+	loadConfig(event.getFile(0).string());
 	setupCamera();
 }
 
