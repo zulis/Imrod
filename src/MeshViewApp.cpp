@@ -163,13 +163,13 @@ void MeshViewApp::loadConfig(const std::string& fileName, bool isReload)
 
 		m_fileMonitorConfig = FileMonitor::create(m_configFileName);
 
-		Config meshCfg(m_configFileName);
-		m_shaderFileName = meshCfg.getString("Shader", "FileName");
+		Config cfg(m_configFileName);
+		m_shaderFileName = cfg.getString("Shader", "FileName");
 		loadShader(m_shaderFileName);
 
 		if (!isReload)
 		{
-			m_assimpLoader = AssimpLoader(getAssetPath(meshCfg.getString("Model", "FileName")), false);
+			m_assimpLoader = AssimpLoader(getAssetPath(cfg.getString("Model", "FileName")), false);
 			m_assimpLoader.setAnimation(0);
 			m_assimpLoader.enableTextures(false);
 			m_assimpLoader.enableSkinning(false);
@@ -177,7 +177,7 @@ void MeshViewApp::loadConfig(const std::string& fileName, bool isReload)
 			m_assimpLoader.enableMaterials(false);
 		}
 
-		meshCfg.setSection("Textures");
+		cfg.setSection("Textures");
 
 		if(m_texDiffuse)
 			m_texDiffuse = NULL;
@@ -197,57 +197,57 @@ void MeshViewApp::loadConfig(const std::string& fileName, bool isReload)
 		m_texEmissivePower = 1.0f;
 
 		m_diffuseEnabled = false;
-		m_aoEnabled = false;
-		m_emissiveEnabled = false;
 		m_normalEnabled = false;
 		m_specularEnabled = false;
+		m_aoEnabled = false;
+		m_emissiveEnabled = false;
 
-		std::string diffuseFileName = meshCfg.getString("Diffuse");
+		std::string diffuseFileName = cfg.getString("Diffuse");
 		if(diffuseFileName != std::string())
 		{
 			m_texDiffuse = gl::Texture::create(loadImage(loadAsset(diffuseFileName)));
-			m_texDiffusePower = meshCfg.getFloat("DiffusePower");
+			m_texDiffusePower = cfg.getFloat("DiffusePower");
 			m_diffuseEnabled = true;
 		}
 
-		std::string normalFileName = meshCfg.getString("Normal");
+		std::string normalFileName = cfg.getString("Normal");
 		if (normalFileName != std::string())
 		{
 			m_texNormal = gl::Texture::create(loadImage(loadAsset(normalFileName)));
-			m_texNormalPower = meshCfg.getFloat("NormalPower");
+			m_texNormalPower = cfg.getFloat("NormalPower");
 			m_normalEnabled = true;
 		}
 
-		std::string specularFileName = meshCfg.getString("Specular");
+		std::string specularFileName = cfg.getString("Specular");
 		if (specularFileName != std::string())
 		{
 			m_texSpecular = gl::Texture::create(loadImage(loadAsset(specularFileName)));
-			m_texSpecularPower = meshCfg.getFloat("SpecularPower");
+			m_texSpecularPower = cfg.getFloat("SpecularPower");
 			m_specularEnabled = true;
 		}
 
-		std::string aoFileName = meshCfg.getString("AO");
+		std::string aoFileName = cfg.getString("AO");
 		if(aoFileName != std::string())
 		{
 			m_texAO = gl::Texture::create(loadImage(loadAsset(aoFileName)));
-			m_texAOPower = meshCfg.getFloat("AOPower");
+			m_texAOPower = cfg.getFloat("AOPower");
 			m_aoEnabled = true;
 		}
 
-		std::string emissiveFileName = meshCfg.getString("Emissive");
+		std::string emissiveFileName = cfg.getString("Emissive");
 		if(emissiveFileName != std::string())
 		{
 			m_texEmissive = gl::Texture::create(loadImage(loadAsset(emissiveFileName)));
-			m_texEmissivePower = meshCfg.getFloat("EmissivePower");
+			m_texEmissivePower = cfg.getFloat("EmissivePower");
 			m_emissiveEnabled = true;
 		}
 
-		meshCfg.setSection("Material");
-		m_matAmbient = meshCfg.getVec3f("Ambient");
-		m_matDiffuse = meshCfg.getVec3f("Diffuse");
-		m_matSpecular = meshCfg.getVec3f("Specular");
-		m_matShininess = meshCfg.getFloat("Shininess");
-		m_gamma = meshCfg.getFloat("Gamma");
+		cfg.setSection("Material");
+		m_matAmbient = cfg.getVec3f("Ambient");
+		m_matDiffuse = cfg.getVec3f("Diffuse");
+		m_matSpecular = cfg.getVec3f("Specular");
+		m_matShininess = cfg.getFloat("Shininess");
+		m_gamma = cfg.getFloat("Gamma");
 	}
 	catch(const std::exception& e)
 	{

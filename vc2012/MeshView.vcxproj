@@ -12,7 +12,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8B180C9A-20EF-4F05-8E9D-6EE35E88C5C2}</ProjectGuid>
-    <RootNamespace>Imrod</RootNamespace>
+    <RootNamespace>MeshView</RootNamespace>
     <Keyword>Win32Proj</Keyword>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -109,7 +109,7 @@
   <ItemGroup>
     <ClCompile Include="..\blocks\assimp\AssimpLoader.cpp" />
     <ClCompile Include="..\blocks\assimp\Node.cpp" />
-    <ClCompile Include="..\src\ImrodApp.cpp" />
+    <ClCompile Include="..\src\MeshViewApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\blocks\assimp\AssimpLoader.h" />
