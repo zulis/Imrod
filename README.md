@@ -1,7 +1,7 @@
 Imrod
 =======
 
-Imrod is a mesh viewer rendered with an OpenGL
+Imrod is a mesh viewer rendered using OpenGL
 
 Screenshot
 ----------
